@@ -11,6 +11,7 @@ Rights are checked again before each summary. When the AI providers are resting 
 builder waits and resumes by itself. Narration audio is not made here; the player voices it on first play.
 """
 import os
+import re
 import shutil
 import threading
 import time
@@ -42,6 +43,27 @@ FILM_KINDS = ("movie", "series")                 # one worker, on the GPU and th
 FILMS = os.environ.get("CINECUT_BUILDER_FILMS", "1") != "0"   # 0: no film worker (it downloads and analyses whole films: heavy on RAM)
 RECHECK_SECONDS = 1800                            # how often resting keys are tried again
 _pick_lock = threading.Lock()
+# YouTube answers caption downloads with HTTP 429 when it limits this address. That says nothing about the video, so
+# the lecture is not skipped: every YouTube lecture waits until the time below, and NASA lectures carry on meanwhile.
+YT_COOLDOWN_SECONDS = 1800
+YT_LIMITED_RE = re.compile(r"HTTP Error 429|Too Many Requests|Sign in to confirm|rate.?limit", re.I)
+_yt_until = [0.0]
+
+
+def _youtube_lecture(e: Dict[str, Any]) -> bool:
+    return e.get("kind") == "lecture" and not (e.get("build") or {}).get("nasa_srt")
+
+
+# Gutenberg often holds one book several times ("... HTML Edition", "... Illustrated by Arthur Rackham"). Summarising it
+# again spends the free AI allowance on a copy, so a book or story is one work per title core, author and volume.
+_EDITION_TAIL_RE = re.compile(r"\s+(illustrated|with (a|an|the) |being |translated |edited |html edition|an? (new )?edition)\b.*$")
+_EDITION_WORD_RE = re.compile(r"\b(html|edition|the|a|an)\b")
+
+
+def work_key(e: Dict[str, Any]) -> str:
+    t = _EDITION_TAIL_RE.sub("", (e.get("title") or "").lower())
+    t = " ".join(_EDITION_WORD_RE.sub(" ", re.sub(r"[\"'’‘“”.,:;!?()\[\]{}/\\—–|।॥-]", " ", t)).split())   # punctuation only: Hindi vowel signs stay
+    return f"{e.get('kind')}|{t}|{(e.get('creator') or '').lower().split(',')[0].strip()}"
 _threads: List[threading.Thread] = []
 _last_recheck = [0.0]
 
@@ -95,7 +117,18 @@ def _eligible(e: Dict[str, Any]) -> bool:
 
 def _pick(kinds=None) -> Optional[Dict[str, Any]]:
     kinds = tuple(kinds or ROTATION)
-    cands = [e for e in lib.all_entries() if e.get("kind") in kinds and _eligible(e)]
+    cooling = time.time() < _yt_until[0]
+    entries = lib.all_entries()
+    have = {work_key(e) for e in entries if e.get("kind") in ("book", "story")
+            and (e.get("status") != "catalog" or (e.get("build") or {}).get("state") == "building")}
+    cands = []
+    for e in entries:
+        if e.get("kind") not in kinds or not _eligible(e) or (cooling and _youtube_lecture(e)):
+            continue
+        if e["kind"] in ("book", "story") and work_key(e) in have:
+            _mark(e, state="skipped", error="another edition of this work is already in the library")
+            continue
+        cands.append(e)
     if not cands:
         return None
     asked = [e for e in cands if (e.get("build") or {}).get("requested")]
@@ -211,16 +244,28 @@ def build_lecture(e: Dict[str, Any]) -> str:
     if rep["status"] != "cleared":
         _mark(e, state="skipped", error=" ".join(rep.get("reasons") or ["no open licence"])[:300])
         return "skip"
+    if time.time() < _yt_until[0]:
+        _mark(e, state="queued", deferred=time.time(), error="YouTube is limiting caption downloads; trying again later")
+        return "later"
     work = WORK / (e["id"] + "_subs")
     work.mkdir(parents=True, exist_ok=True)
     try:
-        subprocess.run(["yt-dlp", "--skip-download", "--no-playlist", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,hi.*",
-                        "--convert-subs", "srt", "-o", str(work / "%(id)s.%(ext)s"), url], capture_output=True, timeout=300)
+        run = subprocess.run(["yt-dlp", "--skip-download", "--no-playlist", "--write-subs", "--write-auto-subs", "--sub-langs", "en.*,hi.*",
+                              "--sleep-subtitles", "2", "--convert-subs", "srt", "-o", str(work / "%(id)s.%(ext)s"), url],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         files = _app().rank_subtitle_files(list(work.glob("*.srt")))
         subs = parse_srt_file(str(files[0])) if files else []
         text = ex.transcript_text(subs)
         if len(text.split()) < 500:
-            _mark(e, state="skipped", error="no usable captions")
+            err = run.stderr or ""
+            if not files and YT_LIMITED_RE.search(err):          # refused, not missing: keep it and pause YouTube lectures
+                _yt_until[0] = time.time() + YT_COOLDOWN_SECONDS
+                _mark(e, state="queued", deferred=time.time(), error="YouTube refused the caption download (HTTP 429); trying again later")
+                _log(f"YouTube is limiting caption downloads: YouTube lectures pause for {YT_COOLDOWN_SECONDS // 60} min")
+                return "later"
+            last = next((ln.strip() for ln in reversed(err.splitlines()) if "ERROR" in ln), "")
+            _mark(e, state="skipped", error=("captions too short for an explainer" if files else
+                                             "no captions" + (f" ({last[:200]})" if last else "")))
             return "skip"
         e = lib.get(e["id"]) or e
         if "-SA" in (e["rights"].get("license") or ""):      # NPTEL: keep CC BY-SA (YouTube only says CC BY)
@@ -363,7 +408,7 @@ def _worker(n: int, kinds, heavy: bool) -> None:
                         STATE["skipped"] += 1
                         _log(f"skipped: {e['title'][:60]} ({(lib.get(e['id']) or {}).get('build', {}).get('error', '')[:80]})")
                     else:
-                        _log(f"later: {e['title'][:60]} (waiting for free transcription)")
+                        _log(f"later: {e['title'][:60]} ({((lib.get(e['id']) or {}).get('build') or {}).get('error') or 'waiting for free transcription'})"[:160])
                 except Exception as ex:
                     STATE["failed"] += 1
                     b = (lib.get(e["id"]) or e).get("build") or {}
