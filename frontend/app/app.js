@@ -575,7 +575,9 @@ function upload(file, extra, bar) {
     x.onload = () => {
       let d = {};
       try { d = JSON.parse(x.responseText); } catch (e) { /* ignore */ }
-      if (x.status >= 200 && x.status < 300) resolve(d); else reject(new Error(d.detail || `Upload failed (${x.status}).`));
+      if (x.status >= 200 && x.status < 300) resolve(d);
+      else reject(new Error(d.detail || (x.status === 413 ? "This file is too big to send over the internet (up to 100 MB). On your home Wi-Fi, bigger files work."
+        : `Upload failed (${x.status}).`)));
     };
     x.onerror = () => reject(new Error("Upload failed. Check the connection."));
     x.send(fd);

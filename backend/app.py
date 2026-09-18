@@ -137,14 +137,18 @@ def _host_only(host_header: str) -> str:
 async def security_guard(request: Request, call_next):
     path = request.url.path
     origin = request.headers.get("origin")
-    if PUBLIC_MODE:                       # the Host check guards a local tool against DNS rebinding; a public server has none to guard
+    # A request that came through the Cloudflare tunnel (Cloudflare stamps every one with these headers, and the internet has
+    # no other way in) gets exactly what the hosted site gets. It arrives from 127.0.0.1, so the local rules must not see it.
+    via_tunnel = "cf-connecting-ip" in request.headers or "cf-ray" in request.headers
+    if PUBLIC_MODE or via_tunnel:         # the Host check guards a local tool against DNS rebinding; a public server has none to guard
         if path in ("", "/"):
             return RedirectResponse("/app/", status_code=302)
         if path == "/api/health":         # the studio's health report names the GPU, voices and AI providers: not for the internet
             return Response('{"status":"ok"}', media_type="application/json")
         if not path.startswith(PUBLIC_PATHS):
             return PlainTextResponse("Not found.", status_code=404)
-        if origin and request.method not in ("GET", "HEAD") and (urlparse(origin).hostname or "").lower() not in _allowed_hosts():
+        same_site = _allowed_hosts() | {_host_only(request.headers.get("host", ""))}
+        if origin and request.method not in ("GET", "HEAD") and (urlparse(origin).hostname or "").lower() not in same_site:
             return PlainTextResponse("Blocked: cross-site request.", status_code=403)
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")

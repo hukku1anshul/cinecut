@@ -199,8 +199,8 @@ class LoginRequest(BaseModel):
 
 
 def _set_cookie(request: Request, response: Response, token: str) -> None:
-    response.set_cookie(COOKIE, token, max_age=db.SESSION_DAYS * 86400, httponly=True, samesite="lax",
-                        secure=request.url.scheme == "https")
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"   # behind the tunnel or Render
+    response.set_cookie(COOKIE, token, max_age=db.SESSION_DAYS * 86400, httponly=True, samesite="lax", secure=https)
 
 
 @router.post("/api/app/signup")
