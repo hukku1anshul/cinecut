@@ -137,9 +137,11 @@ def _host_only(host_header: str) -> str:
 async def security_guard(request: Request, call_next):
     path = request.url.path
     origin = request.headers.get("origin")
-    # A request that came through the Cloudflare tunnel (Cloudflare stamps every one with these headers, and the internet has
-    # no other way in) gets exactly what the hosted site gets. It arrives from 127.0.0.1, so the local rules must not see it.
-    via_tunnel = "cf-connecting-ip" in request.headers or "cf-ray" in request.headers
+    # A request that came through a tunnel (Cloudflare or ngrok: both add X-Forwarded-For, Cloudflare also CF-Ray, and the
+    # internet has no other way in) gets exactly what the hosted site gets. It arrives from 127.0.0.1, so the local rules
+    # must never see it. A local visitor who adds such a header only locks themselves out, never in.
+    via_tunnel = any(h in request.headers for h in ("x-forwarded-for", "x-forwarded-host", "forwarded", "cf-connecting-ip",
+                                                    "cf-ray", "ngrok-trace-id"))
     if PUBLIC_MODE or via_tunnel:         # the Host check guards a local tool against DNS rebinding; a public server has none to guard
         if path in ("", "/"):
             return RedirectResponse("/app/", status_code=302)

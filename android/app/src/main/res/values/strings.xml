@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">CineCut</string>
     <string name="share_label">Shorten with CineCut</string>
     <string name="pick_video">Choose a video</string>
     <string name="server_title">Your CineCut server</string>
-    <string name="server_help">The address of the PC running CineCut, for example http://192.168.1.10:8080. On the PC, start CineCut with: python run.py --lan</string>
+    <string name="server_help" tools:ignore="TypographyDashes">The address of the PC running CineCut, for example http://192.168.1.10:8080. On the PC, start CineCut with: python run.py --lan</string>
     <string name="save">Save</string>
     <string name="offline_title">Can\'t reach CineCut</string>
-    <string name="offline_text">CineCut did not answer at %1$s. Check that the PC is on, that CineCut is running with --lan, and that this phone is on the same Wi-Fi.</string>
+    <string name="offline_text" tools:ignore="TypographyDashes">CineCut did not answer at %1$s. Check that the PC is on, that CineCut is running with --lan, and that this phone is on the same Wi-Fi.</string>
     <string name="try_again">Try again</string>
     <string name="change_address">Change address</string>
     <string name="leave_title">Close CineCut?</string>

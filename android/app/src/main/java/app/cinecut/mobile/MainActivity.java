@@ -1,5 +1,6 @@
 package app.cinecut.mobile;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -23,6 +24,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.window.OnBackInvokedDispatcher;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -69,6 +71,9 @@ public class MainActivity extends Activity {
         });
         setContentView(root);
         setUpWebView();
+        if (Build.VERSION.SDK_INT >= 33) {                       // Android 13+: the system's back gesture comes here
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::goBack);
+        }
         pendingLink = sharedLink(getIntent());
         if (server().isEmpty()) {
             askServer(true);
@@ -100,10 +105,9 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
+        s.setUserAgentString("CineCutApp/1.0 (Android " + Build.VERSION.RELEASE + ")");   // skips ngrok's browser warning page
         CookieManager.getInstance().setAcceptCookie(true);
         web.setBackgroundColor(Color.parseColor("#11151C"));
-        web.setLongClickable(false);
-        web.setOnLongClickListener(v -> true);                   // no "save video" menu
         // No DownloadListener is set: a download request does nothing, so the app never saves a file.
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -247,8 +251,13 @@ public class MainActivity extends Activity {
         shown = null;
     }
 
+    @SuppressLint("GestureBackNavigation")                      // only Android 8 to 12 come here; 13+ use the callback in onCreate
     @Override
     public void onBackPressed() {
+        goBack();
+    }
+
+    private void goBack() {
         if (fullScreen != null) {
             leaveFullScreen();
         } else if (web.canGoBack()) {
@@ -272,6 +281,12 @@ public class MainActivity extends Activity {
             return;
         }
         super.onActivityResult(request, result, data);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();                     // keep the login if Android closes the app
     }
 
     @Override
