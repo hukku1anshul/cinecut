@@ -5,6 +5,7 @@ services:
     name: cinecut
     runtime: docker
     plan: free
+    region: singapore
     branch: main
     autoDeploy: true
     healthCheckPath: /api/health
@@ -17,6 +18,9 @@ services:
         value: "200"
       - key: CINECUT_WEB_JOBS
         value: "1"
+      # Accounts and agreement records: a free Neon Postgres (Render's free disk is wiped on every deploy).
+      - key: DATABASE_URL
+        sync: false
       # AI keys: Render asks for these when the Blueprint is created; they are never stored in the repo.
       - key: GEMINI_API_KEY
         sync: false

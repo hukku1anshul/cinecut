@@ -1,7 +1,8 @@
 """
 Accounts, sessions, subscriptions, organisations, credits, progress, API keys and work items for the CineCut web app.
 
-Everything lives in one SQLite file (data/cinecut.db). Passwords are stored as scrypt hashes; session cookies and
+On the studio PC everything lives in one SQLite file (data/cinecut.db); a hosted copy sets DATABASE_URL and uses
+Postgres instead (see conn()). Passwords are stored as scrypt hashes; session cookies and
 API keys are random tokens stored only as SHA-256 hashes. Credits are a ledger (every change has a reason and a
 spend never takes a balance below zero); they are kept for later pricing, and everything is free for now.
 """
@@ -65,9 +66,100 @@ CREATE INDEX IF NOT EXISTS work_user ON work_items(user_id, created);
 """
 
 
+# ------------------------------------------------------------------ storage: SQLite on the studio PC, Postgres when hosted
+# A hosted server (Render's free plan) loses its disk on every deploy, and with it the accounts and the agreement records,
+# so there DATABASE_URL points at a free Postgres (Neon). The SQL below is written once, in SQLite's dialect; _pg_sql()
+# makes the few changes Postgres needs, and rows behave the same either way (row["col"], row[0], dict(row)).
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+_pg: Dict[str, Any] = {"conn": None, "used": 0.0}
+
+
+class _Row(dict):
+    """A Postgres row that also answers row[0], like sqlite3.Row."""
+    __slots__ = ("_values",)
+
+    def __init__(self, cols, values):
+        super().__init__(zip(cols, values))
+        self._values = values
+
+    def __getitem__(self, k):
+        return self._values[k] if isinstance(k, int) else dict.__getitem__(self, k)
+
+
+def _pg_rows(cursor):
+    cols = [d.name for d in cursor.description] if cursor.description else []
+    return lambda values: _Row(cols, values)
+
+
+_PG_SWAPS = [("?", "%s"), ("MAX(completions.score, excluded.score)", "GREATEST(completions.score, excluded.score)")]
+
+
+def _pg_sql(sql: str) -> str:
+    for a, b in _PG_SWAPS:
+        sql = sql.replace(a, b)
+    return sql
+
+
+def _pg_schema() -> str:
+    return (SCHEMA.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+            .replace(" REAL", " DOUBLE PRECISION").replace(" BLOB", " BYTEA"))
+
+
+class _PgConn:
+    """The part of sqlite3.Connection this module uses, on a psycopg connection."""
+
+    def __init__(self, c):
+        self.c = c
+
+    def execute(self, sql: str, params=()):
+        cur = self.c.cursor()
+        cur.execute(_pg_sql(sql), tuple(params))
+        return cur
+
+    def executescript(self, script: str) -> None:
+        for stmt in script.split(";"):
+            if stmt.strip():
+                self.c.execute(stmt)
+
+
+def _pg_connection():
+    c = _pg["conn"]
+    if c is not None and not c.closed and not c.broken and time.time() - _pg["used"] < 60:
+        return c
+    if c is not None and not c.closed and not c.broken:
+        try:                                  # idle for a while: Neon may have closed it while scaled to zero
+            c.execute("SELECT 1")
+            c.commit()
+            return c
+        except Exception:
+            pass
+    try:
+        if c is not None:
+            c.close()
+    except Exception:
+        pass
+    import psycopg
+    c = psycopg.connect(DATABASE_URL, row_factory=_pg_rows, connect_timeout=20)
+    _pg["conn"] = c
+    return c
+
+
 @contextmanager
-def conn() -> Iterator[sqlite3.Connection]:
+def conn() -> Iterator[Any]:
     with _lock:
+        if PG:
+            c = _pg_connection()
+            try:
+                yield _PgConn(c)
+                c.commit()
+            except BaseException:
+                if not c.broken:
+                    c.rollback()
+                raise
+            finally:
+                _pg["used"] = time.time()
+            return
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         c = sqlite3.connect(str(DB_PATH), timeout=10)
         c.row_factory = sqlite3.Row
@@ -80,6 +172,10 @@ def conn() -> Iterator[sqlite3.Connection]:
 
 def init() -> None:
     with conn() as c:
+        if PG:
+            c.executescript(_pg_schema())
+            c.execute("ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'INR'")
+            return
         c.executescript(SCHEMA)
         try:                                 # orders made before prices in dollars and pounds were rupees
             c.execute("ALTER TABLE orders ADD COLUMN currency TEXT DEFAULT 'INR'")
@@ -117,8 +213,8 @@ def create_user(email: str, password: str, name: str = "") -> Dict[str, Any]:
     with conn() as c:
         if c.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
             raise AccountError("An account with this email already exists. Log in instead.")
-        uid = c.execute("INSERT INTO users (email, name, pw_hash, pw_salt, created) VALUES (?, ?, ?, ?, ?)",
-                        (email, (name or "").strip()[:60], _hash(password, salt), salt, now)).lastrowid
+        uid = c.execute("INSERT INTO users (email, name, pw_hash, pw_salt, created) VALUES (?, ?, ?, ?, ?) RETURNING id",
+                        (email, (name or "").strip()[:60], _hash(password, salt), salt, now)).fetchone()[0]
         if SIGNUP_CREDITS:
             c.execute("INSERT INTO ledger (user_id, delta, reason, created) VALUES (?, ?, 'welcome', ?)", (uid, SIGNUP_CREDITS, now))
         return _user(c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone())
@@ -269,8 +365,8 @@ def create_org(owner_id: int, name: str, kind: str, languages: str = "English,Hi
         raise AccountError("Give the workspace a name.")
     code = secrets.token_urlsafe(6).replace("-", "").replace("_", "")[:8].upper()
     with conn() as c:
-        oid = c.execute("INSERT INTO orgs (name, kind, owner_id, invite_code, languages, created) VALUES (?, ?, ?, ?, ?, ?)",
-                        (name, kind, owner_id, code, languages, time.time())).lastrowid
+        oid = c.execute("INSERT INTO orgs (name, kind, owner_id, invite_code, languages, created) VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+                        (name, kind, owner_id, code, languages, time.time())).fetchone()[0]
         c.execute("INSERT INTO members VALUES (?, ?, 'owner', ?)", (oid, owner_id, time.time()))
     return get_org(oid)
 
@@ -302,7 +398,7 @@ def join_org(user_id: int, invite_code: str) -> Dict[str, Any]:
         row = c.execute("SELECT * FROM orgs WHERE invite_code = ?", ((invite_code or "").strip().upper(),)).fetchone()
         if not row:
             raise AccountError("That invite code was not found.")
-        c.execute("INSERT OR IGNORE INTO members VALUES (?, ?, 'member', ?)", (row["id"], user_id, time.time()))
+        c.execute("INSERT INTO members VALUES (?, ?, 'member', ?) ON CONFLICT DO NOTHING", (row["id"], user_id, time.time()))
     return get_org(row["id"])
 
 
@@ -326,7 +422,9 @@ def remove_member(org_id: int, user_id: int) -> None:
 
 def add_org_title(org_id: int, title_id: str, user_id: int, required: bool = False) -> None:
     with conn() as c:
-        c.execute("INSERT OR REPLACE INTO org_titles VALUES (?, ?, ?, ?, ?)", (org_id, title_id, user_id, int(required), time.time()))
+        c.execute("INSERT INTO org_titles VALUES (?, ?, ?, ?, ?) ON CONFLICT(org_id, title_id) DO UPDATE SET "
+                  "added_by = excluded.added_by, required = excluded.required, created = excluded.created",
+                  (org_id, title_id, user_id, int(required), time.time()))
 
 
 def remove_org_title(org_id: int, title_id: str) -> None:
@@ -342,7 +440,7 @@ def org_title_ids(org_id: int) -> List[Dict[str, Any]]:
 def record_completion(org_id: int, user_id: int, title_id: str, score: int, total: int) -> None:
     with conn() as c:
         c.execute("INSERT INTO completions VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(org_id, user_id, title_id) DO UPDATE SET "
-                  "score = MAX(score, excluded.score), total = excluded.total, completed = excluded.completed",
+                  "score = MAX(completions.score, excluded.score), total = excluded.total, completed = excluded.completed",
                   (org_id, user_id, title_id, int(score), int(total), time.time()))
 
 
@@ -459,11 +557,11 @@ def record_consent(user_id: int, kind: str, version: str, text_hash: str, basis:
     """Keeps one acceptance: the wording (by version and fingerprint), what was declared, and which exact file it was
     about. This is the evidence in a later dispute, so it is never changed or deleted with the file."""
     with conn() as c:
-        cur = c.execute("INSERT INTO consents (user_id, kind, version, text_hash, basis, details, work_id, file_name, "
-                        "file_sha256, file_bytes, ip, agent, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        row = c.execute("INSERT INTO consents (user_id, kind, version, text_hash, basis, details, work_id, file_name, "
+                        "file_sha256, file_bytes, ip, agent, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
                         (user_id, kind, version, text_hash, basis, details, work_id, file_name, file_sha256,
-                         file_bytes, ip, agent[:300], time.time()))
-    return int(cur.lastrowid)
+                         file_bytes, ip, agent[:300], time.time())).fetchone()
+    return int(row[0])
 
 
 def _consent_row(row: sqlite3.Row) -> Dict[str, Any]:
