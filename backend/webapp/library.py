@@ -620,9 +620,14 @@ def apply_explainer(entry: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, 
     pieces = [{"section": -1, "text": p} for p in _pieces(result.get("intro") or "")]
     pieces += [{"section": i, "text": p} for i, s in enumerate(sections) for p in _pieces(s["narration"])]
     words = sum(len(p["text"].split()) for p in pieces)
+    based_on = e.get("source_title") or e.get("title")
+    if (e.get("build") or {}).get("nasa_srt") and result.get("title") and not e.get("source_title"):
+        # NASA's archive names are often file names ("2021-05-05-Community Leaders V1- OC"): the shelf shows the
+        # explainer's own title, and NASA's name stays in the credit line (rights.attribution) and in based_on.
+        e["source_title"], e["title"] = e["title"], result["title"]
     e.update({"script": {"title": result.get("title"), "thesis": result.get("thesis"), "hook": result.get("hook"), "sections": sections,
                          "takeaways": result.get("takeaways") or [], "glossary": result.get("glossary") or [], "quiz": result.get("quiz") or [],
-                         "based_on": e.get("title")},
+                         "based_on": based_on},
               "pieces": dict(e.get("pieces") or {}, **{lang: pieces}), "languages": sorted(set(e.get("languages") or []) | {lang}),
               "minutes": round(words / (190 if lang != "English" else 140), 1), "description": result.get("thesis") or e.get("description"),
               "status": "ready"})
