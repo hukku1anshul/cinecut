@@ -818,8 +818,8 @@ def _download_with_ytdlp(url: str, task: Dict[str, Any], max_height: int = 720) 
            "--print", "before_dl:TITLE:%(title)s", "--print", "after_move:FILE:%(filepath)s",
            "-o", str(dl_dir / "%(title).80s [%(id)s].%(ext)s"), url]
     title, file_path, err_lines = "", None, []
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                            encoding="utf-8", errors="replace")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                            env=dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1"))   # titles in Hindi survive the pipe
     for line in proc.stdout:
         line = line.rstrip()
         if line.startswith("TITLE:"):
