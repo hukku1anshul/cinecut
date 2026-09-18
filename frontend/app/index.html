@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineCut</title>
+  <meta name="description" content="Public-domain classics, books and lectures retold in Hindi and English, to watch or listen." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="#/library" aria-label="CineCut home"><span class="logo" aria-hidden="true"></span>CineCut</a>
+    <nav class="nav" id="nav" aria-label="Main">
+      <a href="#/library" data-route="library">Library</a>
+      <a href="#/create" data-route="create">Create</a>
+      <a href="#/workspace" data-route="workspace">Workspace</a>
+      <a href="#/developers" data-route="developers">Developers</a>
+      <a href="#/plans" data-route="plans">Plans</a>
+    </nav>
+    <div class="who" id="who"></div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="foot">
+    <span>Public-domain and openly licensed works, retold in our own words. Summaries, narration and voices are made with AI.</span>
+    <a href="/terms" target="_blank" rel="noopener">Terms of Use</a>
+  </footer>
+
+  <dialog id="authDialog" class="sheet">
+    <form id="authForm" method="dialog">
+      <h2 id="authTitle">Create your free account</h2>
+      <p class="muted" id="authLede">Everything is free for now.</p>
+      <label id="nameRow">Name <input name="name" autocomplete="name" /></label>
+      <label>Email <input name="email" type="email" required autocomplete="email" /></label>
+      <label>Password <input name="password" type="password" required minlength="8" autocomplete="current-password" /></label>
+      <label class="check" id="agreeRow"><input type="checkbox" name="agree" /> <span>I agree to the <a href="/terms" target="_blank" rel="noopener">Terms of Use</a>, including using only material I have the right to use.</span></label>
+      <p class="error" id="authError" hidden></p>
+      <div class="row">
+        <button class="btn primary" id="authSubmit" value="go">Create account</button>
+        <button class="btn ghost" type="button" id="authSwitch">I already have an account</button>
+      </div>
+      <button class="close" type="button" id="authClose" aria-label="Close">×</button>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+# Secrets: API keys live only in .env on the machine that runs CineCut (see .env.example for the names)
+.env
+.env.*
+!.env.example
+
+# User data and generated media: accounts, agreement records, library recipes, caches, renders
+data/
+output/
+output_*/
+temp/
+models/
+*.db
+*.sqlite
+*.sqlite3
+
+# Media files never belong in the repo
+*.mp4
+*.mkv
+*.mov
+*.avi
+*.webm
+*.m4v
+*.mp3
+*.wav
+*.m4a
+*.aac
+
+# Logs and Python leftovers
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Old local experiments with a copyrighted film: never public
+render_mr_india_new_cut.py
+test_hindi_mr_india.py

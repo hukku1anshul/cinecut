@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "CineCut Watch Guide",
+  "version": "1.0.0",
+  "description": "Shows a CineCut watch guide on Netflix and Prime Video and jumps the official player to key scenes. Nothing is copied or downloaded.",
+  "permissions": [],
+  "host_permissions": ["http://localhost/*", "http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.netflix.com/*", "https://www.primevideo.com/*", "https://www.amazon.com/*",
+                  "https://www.amazon.in/*", "https://www.amazon.co.uk/*", "https://www.amazon.de/*"],
+      "js": ["hud.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.netflix.com/*", "https://www.primevideo.com/*", "https://www.amazon.com/*",
+                  "https://www.amazon.in/*", "https://www.amazon.co.uk/*", "https://www.amazon.de/*"],
+      "js": ["page_bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_idle"
+    }
+  ]
+}

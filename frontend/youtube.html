@@ -1,0 +1,169 @@
+<title>CineCut YouTube packs</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --bg: #f6f4fb; --card: #ffffff; --ink: #1d1830; --muted: #6b6480; --line: #e4e0ef; --accent: #5b3fd1;
+          --ok: #1f8a4c; --warn: #b7791f; --bad: #c0392b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Nirmala UI", "Noto Sans Devanagari", "Segoe UI", system-ui, sans-serif; }
+  header { padding: 24px 32px 8px; display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; justify-content: space-between; }
+  h1 { margin: 0; font-size: 24px; }
+  .sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+  main { padding: 8px 32px 48px; display: grid; gap: 20px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line);
+         border-radius: 10px; padding: 14px 16px; }
+  .bar label { color: var(--muted); font-size: 13px; }
+  select, input[type=number] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  button, .btn { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 6px 12px;
+                 border-radius: 6px; text-decoration: none; display: inline-block; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:focus-visible, .btn:focus-visible { outline: 3px solid #c9bdf5; outline-offset: 1px; }
+  #state { color: var(--muted); }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .pack { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  .thumb { background: #1b1330; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; }
+  .thumb img { max-width: 100%; max-height: 100%; }
+  .body { padding: 12px 14px 14px; display: grid; gap: 8px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12px; }
+  .chip { padding: 2px 8px; border-radius: 99px; background: #efeaff; color: var(--accent); }
+  .chip.draft { background: #fff4e0; color: var(--warn); } .chip.approved { background: #e6f6ec; color: var(--ok); }
+  .chip.published { background: var(--ok); color: #fff; } .chip.rejected { background: #fde8e6; color: var(--bad); }
+  .title { font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+  .empty { color: var(--muted); padding: 24px; text-align: center; background: var(--card); border: 1px dashed var(--line); border-radius: 10px; }
+  dialog { border: none; border-radius: 12px; padding: 0; max-width: min(92vw, 900px); }
+  dialog video { display: block; max-width: 100%; max-height: 80vh; }
+  .rules { font-size: 13px; color: var(--muted); max-width: 90ch; }
+</style>
+<header>
+  <div>
+    <h1>YouTube packs</h1>
+    <p class="sub">Each pack is a finished video with its title, description and tags. Watch it, approve it, publish it from YouTube Studio, then paste the link here.</p>
+  </div>
+  <a class="btn" href="/">Back to the studio</a>
+</header>
+<main>
+  <section class="bar" aria-label="Make packs">
+    <label for="series">Series</label>
+    <select id="series">
+      <option value="maths">गणित की त्वरित विधियाँ · Maths shortcuts (Shorts)</option>
+      <option value="classics">हिंदी की अमर कृतियाँ · Classics</option>
+      <option value="vedas">वेद और उपनिषद · Vedas and Upanishads</option>
+      <option value="audio">सुनिए: ऋग्वेद · Listen: the Rigveda (hymns read in full)</option>
+      <option value="lectures">व्याख्यान, सरल शब्दों में · Lectures in brief</option>
+    </select>
+    <label for="language">Language</label>
+    <select id="language">
+      <option value="both">Hindi and English</option>
+      <option value="hi">Hindi only</option>
+      <option value="en">English only</option>
+    </select>
+    <label for="voice_en">English voice</label>
+    <select id="voice_en">
+      <option value="en-gb">British (male)</option>
+      <option value="en-us">American (female)</option>
+    </select>
+    <label for="voice_hi">Hindi voice</label>
+    <select id="voice_hi">
+      <option value="hi">Male</option>
+      <option value="hi-f">Female</option>
+    </select>
+    <label for="count">How many</label>
+    <input id="count" type="number" min="1" max="20" value="3" />
+    <button class="primary" id="make">Make packs</button>
+    <span id="state" role="status"></span>
+  </section>
+  <div class="tabs" id="tabs" role="group" aria-label="Show">
+    <button data-f="" class="on">All</button><button data-f="draft">Waiting for approval</button>
+    <button data-f="approved">Approved</button><button data-f="published">Published</button><button data-f="rejected">Rejected</button>
+  </div>
+  <section class="grid" id="grid" aria-live="polite"></section>
+  <p class="rules">Only titles free in India, the US and the UK are used, never film clips or NPTEL lectures. Every maths example is worked out and checked by code, and each lesson has three examples and a practice problem. Each pack is one language; in YouTube Studio choose Education, the pack's language (Hindi or English), not made for kids, and for "Altered or synthetic content" copy the answer from the pack's settings: Yes when the narrator is a realistic AI voice (YouTube asks for this; the label sits in the description), No for the standard voice.</p>
+</main>
+<dialog id="player"><video id="video" controls></video></dialog>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let filter = "", data = { packs: [] }, timer = null;
+  const SERIES = { maths: "गणित की त्वरित विधियाँ", classics: "हिंदी की अमर कृतियाँ", vedas: "वेद और उपनिषद" };
+  const STATUS = { draft: "Waiting for approval", approved: "Approved", published: "Published", rejected: "Rejected" };
+
+  async function api(url, body) {
+    const r = await fetch(url, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || "Something went wrong.");
+    return d;
+  }
+  function fmt(sec) { sec = Math.round(sec || 0); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; }
+  function render() {
+    const packs = data.packs.filter((p) => !filter || p.status === filter);
+    $("#grid").innerHTML = packs.length ? packs.map((p) => `
+      <article class="pack">
+        <div class="thumb">${p.files?.thumb ? `<img alt="" src="/api/studio/youtube/${p.id}/${p.files.thumb}?t=${p.updated || p.created}">` : ""}</div>
+        <div class="body">
+          <div class="chips"><span class="chip">${esc(p.language === "en" ? (data.series_en || {})[p.series] || p.series : SERIES[p.series] || p.series)}</span>
+            <span class="chip">${p.language === "en" ? "English" : "हिंदी"}</span>
+            <span class="chip ${p.status}">${esc(STATUS[p.status] || p.status)}</span><span class="chip">${p.kind === "short" ? "Short" : "Video"}</span></div>
+          <div class="title">${esc(p.title)}</div>
+          <div class="meta">${fmt(p.seconds)} · ${esc(p.checks?.size_mb)} MB · cleared: ${esc((p.checks?.cleared_in || []).join(", "))}${p.voice ? ` · voice: ${esc(p.voice.preset)} (${esc(String(p.voice.engine).split(":")[0])})` : ""}</div>
+          ${p.youtube_url ? `<a href="${esc(p.youtube_url)}" target="_blank" rel="noopener">On YouTube</a>` : ""}
+          <div class="actions">
+            <button data-a="watch" data-id="${p.id}" data-v="${esc(p.files?.video)}">Watch</button>
+            <button data-a="copy" data-id="${p.id}" data-k="title">Copy title</button>
+            <button data-a="copy" data-id="${p.id}" data-k="description">Copy description</button>
+            <button data-a="copy" data-id="${p.id}" data-k="tags">Copy tags</button>
+            <a class="btn" href="/api/studio/youtube/${p.id}/${esc(p.files?.video)}?download=true">Download video</a>
+            <a class="btn" href="/api/studio/youtube/${p.id}/thumb.jpg?download=true">Thumbnail</a>
+            ${p.files?.transcript ? `<a class="btn" href="/api/studio/youtube/${p.id}/transcript.txt?download=true">Transcript</a>` : ""}
+            ${p.status !== "approved" && p.status !== "published" ? `<button data-a="status" data-s="approved" data-id="${p.id}">Approve</button>` : ""}
+            ${p.status !== "published" ? `<button data-a="publish" data-id="${p.id}">Mark published</button>` : ""}
+            ${p.status === "draft" ? `<button data-a="status" data-s="rejected" data-id="${p.id}">Reject</button>` : ""}
+          </div>
+        </div>
+      </article>`).join("") : `<div class="empty">No packs here yet. Choose a series above and make a few.</div>`;
+  }
+  function showState(s) {
+    const r = data.ready || {};
+    const ready = r.classics ? ` Ready to film: classics ${r.classics.hi} in Hindi, ${r.classics.en} in English; Vedic titles ${r.vedas.hi} in Hindi, ${r.vedas.en} in English.` : "";
+    $("#state").textContent = (s.running ? `Working: ${s.message} (${s.done} of ${s.wanted})` : (s.message || "")) +
+      (s.errors?.length ? ` Problems: ${s.errors.join("; ")}` : "") + (s.asked?.length ? ` Asked the builder for: ${s.asked.slice(0, 5).join(", ")}` : "") + ready;
+    $("#make").disabled = !!s.running;
+  }
+  async function load() {
+    data = await api("/api/studio/youtube/queue");
+    render();
+    showState(data.state || {});
+    clearTimeout(timer);
+    if (data.state?.running) timer = setTimeout(load, 3000);
+  }
+  $("#make").onclick = async () => {
+    try { showState(await api("/api/studio/youtube/make", { series: $("#series").value, count: +$("#count").value || 3, language: $("#language").value, voice_en: $("#voice_en").value, voice_hi: $("#voice_hi").value })); setTimeout(load, 1500); }
+    catch (e) { $("#state").textContent = e.message; }
+  };
+  $("#tabs").onclick = (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    filter = b.dataset.f; document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b)); render();
+  };
+  $("#grid").onclick = async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const p = data.packs.find((x) => x.id === b.dataset.id);
+    try {
+      if (b.dataset.a === "watch") { $("#video").src = `/api/studio/youtube/${p.id}/${b.dataset.v}`; $("#player").showModal(); $("#video").play(); }
+      if (b.dataset.a === "copy") {
+        const text = b.dataset.k === "tags" ? (p.tags || []).join(", ") : p[b.dataset.k];
+        await navigator.clipboard.writeText(text); b.textContent = "Copied"; setTimeout(() => (b.textContent = "Copy " + b.dataset.k), 1500);
+      }
+      if (b.dataset.a === "status") { await api(`/api/studio/youtube/${p.id}/status`, { status: b.dataset.s }); load(); }
+      if (b.dataset.a === "publish") {
+        const url = prompt("Paste the YouTube link of the published video:");
+        if (url) { await api(`/api/studio/youtube/${p.id}/status`, { status: "published", url }); load(); }
+      }
+    } catch (err) { alert(err.message); }
+  };
+  $("#player").addEventListener("close", () => $("#video").pause());
+  $("#player").onclick = (e) => { if (e.target === $("#player")) $("#player").close(); };
+  load();
+</script>

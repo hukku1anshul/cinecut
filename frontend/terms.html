@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<!--
+  CineCut Terms of Use, version {{VERSION}}.
+  Drafted with AI assistance as a starting point. Before offering CineCut to the public, have a lawyer qualified in
+  Indian IT and copyright law review it, and fill CINECUT_OPERATOR, CINECUT_CONTACT_EMAIL, CINECUT_GRIEVANCE_OFFICER
+  and CINECUT_JURISDICTION_CITY in the .env file (the server fills them in below).
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineCut Terms of Use</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0d1016; --paper: #141922; --ink: #e8e6e1; --muted: #9aa3ad; --rule: #262d39; --accent: #ffb547; --warn: #f87171;
+            --serif: 'Source Serif 4', Georgia, 'Nirmala UI', serif; --sans: 'Plus Jakarta Sans', 'Segoe UI', 'Nirmala UI', sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--serif); font-size: 17px; line-height: 1.65; }
+    .wrap { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+    header { border-bottom: 1px solid var(--rule); padding-bottom: 24px; margin-bottom: 8px; }
+    .kicker { font-family: var(--sans); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+    h1 { font-family: var(--sans); font-size: 38px; line-height: 1.15; margin: 8px 0 12px; font-weight: 800; text-wrap: balance; }
+    .meta { font-family: var(--sans); font-size: 14px; color: var(--muted); }
+    .summary { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 18px 22px; margin: 28px 0; font-family: var(--sans); font-size: 15px; }
+    .summary h2 { margin-top: 0; font-size: 16px; }
+    .summary ul { margin: 0; padding-left: 20px; }
+    .summary li { margin: 6px 0; }
+    nav.toc { font-family: var(--sans); font-size: 14px; columns: 2; column-gap: 32px; margin: 12px 0 8px; color: var(--muted); }
+    nav.toc a { color: var(--muted); text-decoration: none; display: block; padding: 2px 0; }
+    nav.toc a:hover, nav.toc a:focus { color: var(--ink); }
+    h2 { font-family: var(--sans); font-size: 21px; margin: 44px 0 8px; text-wrap: balance; }
+    h2 .n { color: var(--accent); margin-right: 10px; font-variant-numeric: tabular-nums; }
+    p, li { max-width: 68ch; }
+    ol, ul { padding-left: 24px; }
+    li { margin: 6px 0; }
+    strong { color: #fff; font-weight: 600; }
+    .fill { background: rgba(255, 181, 71, .14); color: var(--accent); padding: 0 4px; border-radius: 3px; font-family: var(--sans); font-size: .9em; }
+    .caps { font-family: var(--sans); font-size: 14px; letter-spacing: .01em; }
+    a { color: var(--accent); }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    footer { border-top: 1px solid var(--rule); margin-top: 56px; padding-top: 18px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+    @media (max-width: 640px) { nav.toc { columns: 1; } h1 { font-size: 30px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="kicker">CineCut · Terms of Use</div>
+      <h1>Terms of Use and Copyright Policy</h1>
+      <div class="meta">Version {{VERSION}} · Operated by {{OPERATOR}} · Country settings: {{COUNTRY}}</div>
+    </header>
+
+    <div class="summary">
+      <h2>The short version</h2>
+      <ul>
+        <li>Only submit material you have the right to use: public domain, openly licensed (for example Creative Commons that allows adaptations), made by you, or used with the owner's written permission.</li>
+        <li>CineCut checks the licence of every link. Material without a verified licence is shown to you in <strong>private viewing</strong> only and deleted within {{TTL}} minutes; it cannot be downloaded or exported.</li>
+        <li>CineCut never copies from DRM streaming services such as Netflix or Prime Video.</li>
+        <li>If you break these rules, you are responsible, and you agree to cover {{OPERATOR}}'s losses and legal costs (section 13).</li>
+        <li>Summaries are written and voiced with AI. They can be wrong, and must stay labelled as AI-generated when shared.</li>
+      </ul>
+    </div>
+
+    <nav class="toc" aria-label="Sections">
+      <a href="#s1">1. About these Terms</a><a href="#s2">2. Who can use CineCut</a><a href="#s3">3. What you may submit</a>
+      <a href="#s4">4. Rights check and private viewing</a><a href="#s5">5. What you must not do</a><a href="#s6">6. Public-domain and open material</a>
+      <a href="#s7">7. Own-words summaries</a><a href="#s8">8. AI-generated output</a><a href="#s9">9. Third-party services</a>
+      <a href="#s10">10. Your content</a><a href="#s11">11. Privacy and data</a><a href="#s12">12. Copyright complaints</a>
+      <a href="#s13">13. Your responsibility and indemnity</a><a href="#s14">14. Disclaimers</a><a href="#s15">15. Limits of liability</a>
+      <a href="#s16">16. Suspension and termination</a><a href="#s17">17. Changes</a><a href="#s18">18. Law and disputes</a><a href="#s19">19. Contact</a>
+    </nav>
+
+    <h2 id="s1"><span class="n">1</span>About these Terms</h2>
+    <p>These Terms are an agreement between you and {{OPERATOR}} ("we", "us") about your use of CineCut, the software and any service through which it is offered ("CineCut"). By ticking "I agree" or by using CineCut you accept them. If you use CineCut for an organisation, you accept them for that organisation and confirm you may do so. If you do not agree, do not use CineCut.</p>
+
+    <h2 id="s2"><span class="n">2</span>Who can use CineCut</h2>
+    <p>You must be at least 18 years old, or use CineCut with the consent and supervision of a parent or guardian who accepts these Terms for you. You must follow the laws that apply to you, including copyright law in your country and in the country where any output is shown.</p>
+
+    <h2 id="s3"><span class="n">3</span>What you may submit</h2>
+    <p>You may submit a link, file or text (your "Material") only if at least one of these is true:</p>
+    <ol>
+      <li>it is in the public domain in your country (for India: films, sound recordings and photographs published more than 60 years ago; books and other works whose author, and any translator, died more than 60 years ago);</li>
+      <li>it is published under a licence that allows adaptations, such as Creative Commons CC0, CC BY or CC BY-SA, and you follow its conditions (non-commercial licences such as CC BY-NC allow non-commercial use only);</li>
+      <li>you created it and own all rights in it, including the music, footage and text inside it; or</li>
+      <li>you have written permission from every rights owner to make and use a summary of it.</li>
+    </ol>
+    <p><strong>You must not submit copyrighted films, series, episodes, music, books, lectures, courses or other material that you do not have the right to use in this way.</strong> Buying, renting or subscribing to something, or finding it free to watch online, does not give you the right to copy or adapt it.</p>
+
+    <h2 id="s4"><span class="n">4</span>Rights check and private viewing</h2>
+    <p>Before any work starts, CineCut reads the licence information published at the source (for example YouTube's licence field, the Internet Archive's licence, Wikimedia Commons' licence or Project Gutenberg's author dates) and gives one of these results:</p>
+    <ul>
+      <li><strong>Cleared:</strong> the source says the work is public domain in your country or under an open licence that allows adaptations. All features are available. You must still follow the licence conditions shown to you (credit, non-commercial, share-alike).</li>
+      <li><strong>Declared:</strong> you declared that you made the Material or have written permission. All features are available. Your declaration, its time and the Terms version are recorded on this computer, and you are responsible for its truth.</li>
+      <li><strong>Private viewing:</strong> no verified licence was found, or the licence does not allow adaptations. CineCut shows you the summary inside the app only. Downloads, exports, publishing packs and saved copies are switched off. Everything made for it (the downloaded source, transcript, analysis, narration and video) is deleted when you press "Delete now", {{TTL}} minutes after you last opened it, or when CineCut next starts.</li>
+      <li><strong>Blocked:</strong> the link is a DRM-protected streaming service. CineCut does not download from it. You can use the Watch Guide instead, which works inside the official player.</li>
+    </ul>
+    <p>The rights check is automatic and informational. It can be wrong: an uploader can mislabel a work, and a public-domain film can contain newer music, restorations, dubbing or subtitles that are still protected. <strong>A "Cleared" result is not legal advice and does not transfer any responsibility to us.</strong> Private viewing is provided so that you can see a summary of material you are entitled to watch; it does not make it lawful to copy material you had no right to access, and you must not record, screen-capture or otherwise keep private-viewing output.</p>
+
+    <h2 id="s5"><span class="n">5</span>What you must not do</h2>
+    <ul>
+      <li>circumvent DRM, encryption, paywalls or other technical protection (prohibited by section 65A of India's Copyright Act and similar laws elsewhere);</li>
+      <li>download from a service whose terms forbid it, unless the service offers a download or the rights owner permits it;</li>
+      <li>alter output to avoid copyright detection systems such as YouTube Content ID (for example by flipping, cropping, speeding up or pitch-shifting it);</li>
+      <li>publish, sell, broadcast or monetise output made from Material you have no right to use, or remove credits, licence notices or AI labels from output;</li>
+      <li>use the name, face, voice or likeness of a real person without consent, clone a real person's voice, or make output that impersonates, defames or misleads (Indian courts protect these personality rights);</li>
+      <li>submit unlawful, obscene or harmful content, other people's personal data without a lawful basis, or confidential information you are not allowed to share;</li>
+      <li>use CineCut or its output to train AI models on Material you have no right to use, or overload, reverse-engineer, resell or misuse CineCut or the services it connects to.</li>
+    </ul>
+
+    <h2 id="s6"><span class="n">6</span>Public-domain and openly licensed material</h2>
+    <p>Public-domain status differs between countries: a film that is free in the USA may still be protected in India, and the other way round. CineCut applies the rules of the country shown at the top of this page. Titles, characters, logos and trademarks can be protected even when a work is free, so do not present a summary as official or endorsed. When you share output made from openly licensed Material, keep the credit line CineCut adds, link to the licence, respect non-commercial and share-alike conditions, and never use NoDerivatives (ND) material for a summary.</p>
+    <p>Library titles are offered only in the countries where they are cleared: the library follows the country saved on your account (or, where it is not set, the country your connection comes from). Some summaries carry the terms of their source: lectures from NPTEL are shared under CC BY-SA, so their summaries may be copied and adapted with credit under the same licence; UK government guidance is used under the Open Government Licence v3.0 and keeps its attribution statement; NASA material is shown courtesy of NASA, and NASA does not endorse CineCut; US court opinions carry no copyright.</p>
+
+    <h2 id="s7"><span class="n">7</span>Own-words summaries</h2>
+    <p>CineCut can write its own explainer of a book, lecture or story: it reads the Material, works out its main ideas and retells them in new words, with its own slides and narration. Copyright protects the way something is expressed, not the ideas or facts in it, so explainers quote at most a few words and CineCut checks the narration against the source and rewrites sentences that repeat its wording. A detailed retelling can still be an adaptation of a protected work, so the rules in section 3 apply to explainers as well. An explainer is not a replacement for the original and may leave out or misstate things.</p>
+
+    <h2 id="s8"><span class="n">8</span>AI-generated output</h2>
+    <p>Summaries, narration, voices, captions and quality scores are produced by AI systems and can be inaccurate, incomplete or biased. Review output before relying on it or sharing it. Output that you publish must remain clearly labelled as AI-generated, as required by platform rules and by India's Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules as amended in 2026 for synthetically generated information. CineCut's voices are synthetic voices licensed for this use; they do not imitate any real person.</p>
+
+    <h2 id="s9"><span class="n">9</span>Third-party services</h2>
+    <p>To do its work CineCut can send parts of your Material (transcript text, short low-resolution clips, narration text) to services such as Google's Gemini API, Groq, Cloudflare Workers AI, NVIDIA, Sarvam AI and Microsoft speech services, and it reads from the Internet Archive, Wikimedia Commons, Project Gutenberg, LibriVox and YouTube. Their own terms and privacy policies apply. Some of them offer free tiers under which they may use submitted content to improve their products and may have people review it, so do not submit confidential or personal material. Where the law or a provider's terms require paid services for users in your region (for example the European Economic Area, Switzerland or the United Kingdom for Google's Gemini API), CineCut must be configured with paid services before you use it there.</p>
+
+    <h2 id="s10"><span class="n">10</span>Your content</h2>
+    <p>You keep whatever rights you have in your Material and in output made from it. You give us only the limited permission needed to process your Material to provide CineCut to you. We do not use your Material or output to train AI models.</p>
+
+    <h2 id="s11"><span class="n">11</span>Privacy and data</h2>
+    <p>CineCut runs on your computer. It stores, on that computer: your acceptance of these Terms (version and time), your rights declarations, request counts for the AI services, and, for Cleared and Declared work only, analysis caches and the files you make. Private-viewing work is deleted as described in section 4. If CineCut is offered to you as an online service, {{OPERATOR}} processes the minimum personal data needed to run it, under India's Digital Personal Data Protection Act, 2023, and you can ask for access, correction or deletion by writing to {{EMAIL}}.</p>
+
+    <h2 id="s12"><span class="n">12</span>Copyright complaints</h2>
+    <p>If you believe CineCut or output shared through it infringes your rights, send a notice to our grievance officer ({{GRIEVANCE}}, {{EMAIL}}) with: your name and contact details; the work you own and proof of ownership or authority; where the infringing material is (a link or description); a statement that you believe in good faith the use is not authorised; and a statement that the notice is accurate, signed by you or your authorised agent. We acknowledge notices within 24 hours and act on valid notices as quickly as the law requires (including within 36 hours where India's IT Rules apply). A user whose material was removed may send a counter-notice with the same details and a reasoned explanation. We end access for users who repeatedly infringe. Knowingly false notices or counter-notices can make the sender liable for damages.</p>
+
+    <h2 id="s13"><span class="n">13</span>Your responsibility and indemnity</h2>
+    <p>You alone are responsible for the Material you submit, for every declaration you make, and for any use, sharing, publication or monetisation of output.</p>
+    <p class="caps"><strong>You agree to defend, indemnify and hold harmless {{OPERATOR}}, its owners, directors, employees, contractors, licensors and service providers from and against every claim, demand, notice, proceeding, loss, damage, liability, fine, penalty, settlement, cost and expense (including reasonable lawyers' fees and court costs) arising out of or relating to: (a) Material you submit; (b) your breach of these Terms or of any law; (c) any infringement or alleged infringement of a third party's copyright, trademark, personality, privacy or other right by you or by output you use; (d) any output you publish, distribute or monetise; or (e) any false or misleading declaration.</strong></p>
+    <p>We may take over the defence of a claim at your cost, and you will cooperate with us. You must not settle a claim that affects us without our written consent. This section continues after your use of CineCut ends. It does not limit any right we have against you under law.</p>
+
+    <h2 id="s14"><span class="n">14</span>Disclaimers</h2>
+    <p>CineCut is provided "as is" and "as available". To the fullest extent the law allows, we give no warranty that it will be error-free or uninterrupted, that a rights check is correct, that a work is in the public domain or that a licence is valid, or that output is accurate or fit for any purpose. Nothing in CineCut is legal advice; ask a lawyer about your specific use.</p>
+
+    <h2 id="s15"><span class="n">15</span>Limits of liability</h2>
+    <p>To the fullest extent the law allows, we are not liable for indirect, incidental, special, consequential or punitive losses, or for loss of profits, revenue, data or goodwill. Our total liability to you for all claims about CineCut is limited to the greater of the amount you paid us for CineCut in the 12 months before the claim and ₹1,000. Nothing in these Terms excludes liability that cannot be excluded by law.</p>
+
+    <h2 id="s16"><span class="n">16</span>Suspension and termination</h2>
+    <p>We may suspend or end your access to CineCut, and remove output, if you break these Terms, if we receive a valid complaint about your use, or if the law requires it. You may stop using CineCut at any time and delete its files.</p>
+
+    <h2 id="s17"><span class="n">17</span>Changes</h2>
+    <p>We may update these Terms. Each version has a date. When the version changes, CineCut asks you to accept the new Terms before you continue.</p>
+
+    <h2 id="s18"><span class="n">18</span>Law and disputes</h2>
+    <p>These Terms are governed by the laws of India. The courts at {{CITY}} have exclusive jurisdiction, except that we may seek urgent relief in any court. If a part of these Terms is found unenforceable, the rest remains in force. Our not enforcing a right is not a waiver of it.</p>
+
+    <h2 id="s19"><span class="n">19</span>Contact</h2>
+    <p>{{OPERATOR}} · {{EMAIL}} · Grievance officer: {{GRIEVANCE}}</p>
+
+    <footer>Version {{VERSION}}. These Terms were drafted as a starting point and should be reviewed by a qualified lawyer before CineCut is offered to the public.</footer>
+  </div>
+</body>
+</html>

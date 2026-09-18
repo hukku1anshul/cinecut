@@ -1,0 +1,28 @@
+# Render Blueprint. One-time setup in Render: New > Blueprint, connect the GitHub repo hukku1anshul/cinecut, and fill in
+# the keys it asks for. After that every push to main is deployed automatically.
+services:
+  - type: web
+    name: cinecut
+    runtime: docker
+    plan: free
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: CINECUT_PUBLIC
+        value: "1"
+      - key: CINECUT_LIBRARY_BUILDER
+        value: "0"
+      - key: CINECUT_MAX_UPLOAD_MB
+        value: "200"
+      - key: CINECUT_WEB_JOBS
+        value: "1"
+      # AI keys: Render asks for these when the Blueprint is created; they are never stored in the repo.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false

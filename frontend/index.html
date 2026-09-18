@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineCut AI Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Icons are optional: the app works offline without them -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- TOP HEADER -->
+    <header class="header glass">
+      <div class="header-brand">
+        <div class="brand-icon"><i data-lucide="film"></i></div>
+        <div class="brand-info">
+          <h1>CineCut <span class="badge-ai">11.0</span></h1>
+          <p class="tagline">Summaries of public-domain and openly licensed films, lectures and books, and own-words explainers</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <button class="status-pill watchfolder-btn" id="btnOpenWatchfolderModal"><i data-lucide="folder-sync"></i><span>Watchfolder</span></button>
+        <button class="status-pill tv-streaming-btn" id="btnOpenTvStreamingModal"><i data-lucide="tv"></i><span>Netflix / Prime Guide &amp; TV</span></button>
+        <a class="status-pill" href="/terms" target="_blank" rel="noopener"><i data-lucide="scale"></i><span>Terms</span></a>
+        <button class="status-pill" id="btnOpenStorageModal"><i data-lucide="hard-drive"></i><span>Storage</span></button>
+        <div class="status-pill" id="gpuStatus"><span class="pulse-dot"></span><i data-lucide="cpu"></i><span id="gpuText">Checking GPU...</span></div>
+      </div>
+    </header>
+
+    <main class="main-layout">
+      <!-- 1. VIDEO INGESTION -->
+      <section class="card glass" id="ingestCard">
+        <div class="card-header">
+          <div class="title-with-icon"><i data-lucide="clapperboard"></i><h2>1. Ingest Video</h2></div>
+          <span class="subtitle">Full-length movies, lectures and TV seasons, straight from disk</span>
+        </div>
+
+        <div class="tabs-container">
+          <div class="tabs-nav">
+            <button class="tab-btn active" data-tab="local"><i data-lucide="folder"></i> Local File Path</button>
+            <button class="tab-btn" data-tab="upload"><i data-lucide="upload-cloud"></i> Browser Upload</button>
+            <button class="tab-btn" data-tab="url"><i data-lucide="globe"></i> Video URL / YouTube</button>
+            <button class="tab-btn" data-tab="season"><i data-lucide="tv"></i> TV Season Batch</button>
+            <button class="tab-btn" data-tab="library"><i data-lucide="library"></i> Free Library</button>
+            <button class="tab-btn" data-tab="explain"><i data-lucide="book-open"></i> Book / Text: Own Summary</button>
+          </div>
+
+          <div class="tab-content active" id="tab-local">
+            <div class="input-group">
+              <label for="localFilePath">Full path to the video file:</label>
+              <div class="input-with-action">
+                <input type="text" id="localFilePath" placeholder="e.g. C:\Movies\Interstellar.2014.1080p.mp4" />
+                <button class="btn btn-primary" id="btnInspectLocal"><i data-lucide="search"></i> Inspect Video</button>
+              </div>
+              <p class="field-hint">No copying: large files are read in place. A subtitle file with the same name next to the video is found automatically.</p>
+            </div>
+            <div class="input-group" style="margin-top: 10px;">
+              <label for="externalSrtPath">Optional subtitle / transcript file (.srt or .vtt):</label>
+              <input type="text" id="externalSrtPath" placeholder="e.g. C:\Movies\Interstellar.en.srt" />
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-upload">
+            <div class="drop-zone" id="dropZone">
+              <i data-lucide="video" class="drop-icon"></i>
+              <p class="drop-title">Drag &amp; drop a video file here</p>
+              <p class="drop-sub">MP4, MKV, MOV, WEBM. For big movies the Local File Path tab is faster (no copy).</p>
+              <input type="file" id="fileUploadInput" accept="video/*" style="display:none;" />
+              <button class="btn btn-secondary" id="btnSelectFile"><i data-lucide="file-plus"></i> Select File</button>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-url">
+            <div class="input-group">
+              <label for="videoUrl">YouTube or direct video URL:</label>
+              <div class="input-with-action">
+                <input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." />
+                <select id="urlMaxHeight" class="styled-select-sm" title="Download quality">
+                  <option value="480">480p</option>
+                  <option value="720" selected>720p</option>
+                  <option value="1080">1080p</option>
+                </select>
+                <button class="btn btn-primary" id="btnCheckRights"><i data-lucide="shield-check"></i> Check licence</button>
+              </div>
+              <p class="field-hint">CineCut reads the licence at the source before downloading. Public-domain and Creative Commons videos get every feature; anything else is shown to you in private viewing and deleted afterwards. DRM streaming services are never downloaded. YouTube downloads need Deno (<code>winget install DenoLand.Deno</code>).</p>
+              <div class="rights-panel" id="rightsPanel" hidden></div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="tab-library">
+            <div class="input-group">
+              <label for="libraryQuery">Find public-domain and openly licensed films, lectures and books:</label>
+              <div class="input-with-action">
+                <input type="text" id="libraryQuery" placeholder="e.g. Raja Harishchandra, Tagore, linear algebra" />
+                <select id="libraryKind" class="styled-select-sm" aria-label="What to look for">
+                  <option value="all">Everything</option>
+                  <option value="films">Films and series</option>
+                  <option value="lectures">Lectures</option>
+                  <option value="books">Books</option>
+                  <option value="audiobooks">Audiobooks</option>
+                </select>
+                <button class="btn btn-primary" id="btnLibrarySearch"><i data-lucide="search"></i> Search</button>
+              </div>
+              <p class="field-hint">Searches the Internet Archive, Wikimedia Commons, YouTube (Creative Commons uploads only), Project Gutenberg and LibriVox. Each result's status is worked out for <span id="libraryCountry">India</span>.</p>
+            </div>
+            <div class="library-results" id="libraryResults"></div>
+          </div>
+
+          <div class="tab-content" id="tab-explain">
+            <p class="field-hint">CineCut reads the material, works out its essence and retells it in new words with its own slides and narration. It checks the narration against the source and rewrites anything that repeats its wording.</p>
+            <div class="explain-grid">
+              <div class="input-group">
+                <label for="exSource">Source</label>
+                <select id="exSource" class="styled-select">
+                  <option value="gutenberg">Project Gutenberg book</option>
+                  <option value="text">Paste text</option>
+                  <option value="file">Text, PDF or subtitle file on this PC</option>
+                </select>
+              </div>
+              <div class="input-group" id="exGutenbergRow"><label for="exGutenbergId">Book number or link</label><input type="text" id="exGutenbergId" placeholder="e.g. 132 or gutenberg.org/ebooks/132" /></div>
+              <div class="input-group" id="exFileRow" hidden><label for="exFilePath">Full path (.txt, .md, .pdf, .srt)</label><input type="text" id="exFilePath" placeholder="e.g. D:\Notes\lecture.srt" /></div>
+              <div class="input-group"><label for="exTitle">Title (optional)</label><input type="text" id="exTitle" /></div>
+              <div class="input-group"><label for="exAuthor">Author (optional)</label><input type="text" id="exAuthor" /></div>
+              <div class="input-group">
+                <label for="exKind">It is a</label>
+                <select id="exKind" class="styled-select"><option value="book">Book of ideas</option><option value="story">Story or novel</option><option value="lecture">Lecture or course</option></select>
+              </div>
+              <div class="input-group">
+                <label for="exMinutes">Length</label>
+                <select id="exMinutes" class="styled-select"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select>
+              </div>
+              <div class="input-group">
+                <label for="exLanguage">Language</label>
+                <select id="exLanguage" class="styled-select"><option>English</option><option>Hindi</option></select>
+              </div>
+              <div class="input-group"><label for="exVoice">Voice</label><select id="exVoice" class="styled-select"></select></div>
+            </div>
+            <div class="input-group" id="exTextRow" hidden><label for="exText">Text (at least 150 words)</label><textarea id="exText" rows="6"></textarea></div>
+            <div class="rights-row" id="exRightsRow" hidden>
+              <label class="rights-basis">Your rights to this text:
+                <select id="exBasis" class="styled-select-sm">
+                  <option value="private" selected>None of these: private viewing, deleted afterwards</option>
+                  <option value="own">I wrote it or own its rights</option>
+                  <option value="permission">I have written permission from the rights owner</option>
+                </select>
+              </label>
+              <label class="checkbox-row" id="exConfirmWrap" hidden><input type="checkbox" id="exConfirm" /><span>I confirm this is true and accept responsibility for it under the <a href="/terms" target="_blank" rel="noopener">Terms</a> (section 13).</span></label>
+            </div>
+            <button class="btn btn-primary" id="btnMakeExplainer"><i data-lucide="sparkles"></i> Create own-words summary</button>
+          </div>
+
+          <div class="tab-content" id="tab-season">
+            <div class="input-group">
+              <label for="seasonFolderPath">Full path to a TV season folder:</label>
+              <div class="input-with-action">
+                <input type="text" id="seasonFolderPath" placeholder="e.g. C:\TV\Show.S01" />
+                <button class="btn btn-primary" id="btnScanSeason"><i data-lucide="search"></i> Scan Season Episodes</button>
+              </div>
+              <p class="field-hint">Sorts S01E01..S01E10 and gives the premiere and finale a bigger share of the time.</p>
+            </div>
+            <div id="seasonEpisodesContainer" style="display: none; margin-top: 15px;">
+              <div class="season-header-summary">
+                <span id="seasonEpisodesSummaryText">Season: 0 Episodes</span>
+                <div class="season-target-input">
+                  <label for="seasonTargetDuration">Season recap length:</label>
+                  <select id="seasonTargetDuration" class="styled-select-sm">
+                    <option value="30">30 minutes</option>
+                    <option value="45" selected>45 minutes</option>
+                    <option value="60">60 minutes</option>
+                  </select>
+                </div>
+              </div>
+              <div class="episodes-list" id="episodesList"></div>
+              <button class="btn btn-hero" id="btnAssembleSeason" style="margin-top: 15px; width: 100%;"><i data-lucide="play-circle"></i> Assemble &amp; Render Season Recap</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="meta-strip" id="metaStrip" style="display: none;">
+          <div class="meta-item"><span class="meta-label">Title</span><span class="meta-val highlight" id="metaFileName">-</span></div>
+          <div class="meta-item"><span class="meta-label">Duration</span><span class="meta-val" id="metaDuration">-</span></div>
+          <div class="meta-item"><span class="meta-label">Resolution</span><span class="meta-val" id="metaResolution">-</span></div>
+          <div class="meta-item">
+            <span class="meta-label">Subtitles</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="meta-val" id="metaSubtitles">-</span>
+              <button class="btn btn-sm btn-outline" id="btnRunWhisperASR" style="display: none; padding: 2px 6px; font-size: 0.7rem;"><i data-lucide="mic" style="width: 12px; height: 12px;"></i> Transcribe (Whisper)</button>
+            </div>
+          </div>
+          <div class="meta-item"><span class="meta-label">Encoder</span><span class="meta-val badge-gpu" id="metaEncoder">-</span></div>
+        </div>
+        <div class="rights-row" id="rightsRow" hidden>
+          <span class="rights-chip private" id="rightsChip">Private viewing</span>
+          <span class="rights-text" id="rightsText"></span>
+          <label class="rights-basis" id="rightsBasisWrap">Your rights:
+            <select id="rightsBasis" class="styled-select-sm">
+              <option value="private" selected>None of these: private viewing, deleted afterwards</option>
+              <option value="own">I made it or own all its rights</option>
+              <option value="permission">I have written permission from the rights owner</option>
+            </select>
+          </label>
+          <label class="checkbox-row" id="rightsConfirmWrap" hidden><input type="checkbox" id="rightsConfirm" /><span>I confirm this is true and accept responsibility for it under the <a href="/terms" target="_blank" rel="noopener">Terms</a> (section 13).</span></label>
+        </div>
+      </section>
+
+      <!-- 2. EDITORIAL CONTROLS -->
+      <section class="card glass" id="configCard">
+        <div class="card-header">
+          <div class="title-with-icon"><i data-lucide="sliders"></i><h2>2. Editorial &amp; Story Controls</h2></div>
+        </div>
+
+        <div class="config-grid">
+          <!-- CONTENT MODE -->
+          <div class="config-box">
+            <div class="box-title"><label><i data-lucide="layers"></i> What are you condensing?</label></div>
+            <div class="spoiler-options">
+              <label class="spoiler-card content-mode-card active">
+                <input type="radio" name="contentMode" value="movie" checked />
+                <div class="card-body"><div class="card-title">🎬 Movie / TV episode</div><p>Keeps the story arc: setup, turning points, climax and ending.</p></div>
+              </label>
+              <label class="spoiler-card content-mode-card">
+                <input type="radio" name="contentMode" value="lecture" />
+                <div class="card-body"><div class="card-title">🎓 Lecture / tutorial / webinar</div><p>Keeps definitions, key explanations, examples and summaries. Drops pauses and housekeeping. Exports study notes.</p></div>
+              </label>
+            </div>
+            <div class="input-group" style="margin-top: 10px;">
+              <label for="filmTitleInput">Title used for the story lookup:</label>
+              <input type="text" id="filmTitleInput" placeholder="Filled in from the file name, e.g. Mr. India (1987)" />
+            </div>
+          </div>
+
+          <!-- TARGET DURATION -->
+          <div class="config-box">
+            <div class="box-title">
+              <label><i data-lucide="clock"></i> Target Length</label>
+              <span class="duration-counter" id="targetDurationBadge">30 Mins</span>
+            </div>
+            <div class="quick-presets">
+              <button class="pill-btn" data-minutes="5">5 min</button>
+              <button class="pill-btn" data-minutes="10">10 min</button>
+              <button class="pill-btn" data-minutes="15">15 min</button>
+              <button class="pill-btn" data-minutes="20">20 min</button>
+              <button class="pill-btn active" data-minutes="30">30 min</button>
+              <button class="pill-btn" data-minutes="45">45 min</button>
+            </div>
+            <input type="range" id="durationSlider" min="3" max="60" value="30" step="1" class="slider" />
+            <div class="slider-labels"><span>3 min</span><span>15 min</span><span>30 min</span><span>45 min</span><span>60 min</span></div>
+          </div>
+
+          <!-- SPOILER CONTROL -->
+          <div class="config-box">
+            <div class="box-title"><label><i data-lucide="shield-alert"></i> Spoiler Control</label></div>
+            <div class="spoiler-options">
+              <label class="spoiler-card active">
+                <input type="radio" name="spoilerDial" value="full_cut" checked />
+                <div class="card-body"><div class="card-title">🎬 Full story</div><p>Acts 1 to 3, including the climax and ending.</p></div>
+              </label>
+              <label class="spoiler-card">
+                <input type="radio" name="spoilerDial" value="teaser_spoiler_free" />
+                <div class="card-body"><div class="card-title">🛡️ Spoiler-free teaser</div><p>Uses only the first 65% of the film and stops before the climax.</p></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- AI DIRECTOR -->
+          <div class="config-box" id="aiDirectorBox">
+            <div class="box-title">
+              <label><i data-lucide="sparkles"></i> Gemini AI Director (optional)</label>
+              <label class="switch"><input type="checkbox" id="toggleAiDirector" /><span class="toggle-slider"></span></label>
+            </div>
+            <p class="ai-desc">With a Google AI Studio key, Gemini reads the transcript to pick scenes, looks up story beats for films not in the built-in database, and writes narration. Without a key everything runs offline.</p>
+            <div id="aiConfigSection" style="opacity: 0.4;">
+              <div class="input-with-action">
+                <input type="password" id="geminiApiKey" placeholder="Gemini API key (stored only in this browser)" autocomplete="off" />
+                <button class="btn btn-sm btn-secondary" id="btnSaveKey"><i data-lucide="save"></i> Save</button>
+              </div>
+              <p class="field-hint" id="aiKeyStatus">Uses the newest Gemini Flash model on your key. On the free tier Google may use prompts to improve its products, so avoid private material.</p>
+            </div>
+          </div>
+
+          <!-- SCENE VIEWING -->
+          <div class="config-box">
+            <div class="box-title">
+              <label><i data-lucide="eye"></i> AI looks at scenes</label>
+              <label class="switch"><input type="checkbox" id="toggleVision" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <p class="ai-desc">For songs, fights and silent moments, small low-resolution clips go to Gemini's free tier, so the story finder, the filters and the narration know what happens on screen.</p>
+          </div>
+
+          <!-- CHARACTER POV -->
+          <div class="config-box">
+            <div class="box-title"><label><i data-lucide="user-check"></i> Character Focus</label></div>
+            <p class="ai-desc">Keep more of the scenes with one character. Type a name or pick a suggestion.</p>
+            <div class="input-group">
+              <input type="text" id="characterInput" class="styled-select" list="characterList" placeholder="Type a name (leave empty for everyone)" autocomplete="off" />
+              <datalist id="characterList"></datalist>
+              <p class="field-hint" id="characterDetectHint">Names are suggested after analysis.</p>
+            </div>
+          </div>
+
+          <!-- FILTERS -->
+          <div class="config-box flavor-profiles-box" style="grid-column: 1 / -1;">
+            <div class="box-title">
+              <label><i data-lucide="sliders-horizontal"></i> What to include</label>
+              <span class="field-hint" style="margin: 0;">The story's core beats are always kept. Tick any extras you want; you can pick several.</span>
+            </div>
+            <div class="flavor-grid">
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="song" /><div class="card-body"><div class="card-title">🎶 Songs</div><p>Song sequences, found from music captions or continuous music.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="action" /><div class="card-body"><div class="card-title">⚡ Action</div><p>Fights, chases and climaxes: fast cutting and loud audio.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="comedy" /><div class="card-body"><div class="card-title">😂 Comedy</div><p>Comic scenes and quick back-and-forth dialogue.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="emotional" /><div class="card-body"><div class="card-title">💔 Emotional</div><p>Quiet, slow scenes: loss, sacrifice, confessions.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="romance" /><div class="card-body"><div class="card-title">❤️ Romance</div><p>Story beats about love and relationships.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="hero" /><div class="card-body"><div class="card-title">🦸 Hero</div><p>The protagonist's key moments.</p></div></label>
+              <label class="style-card filter-card"><input type="checkbox" name="filterPick" value="villain" /><div class="card-body"><div class="card-title">🦹 Villain</div><p>The antagonist and their schemes.</p></div></label>
+            </div>
+            <div class="filter-share-row">
+              <label for="filterShare">Time for your picks: <strong id="filterShareValue">40%</strong></label>
+              <input type="range" id="filterShare" min="20" max="60" step="5" value="40" class="slider" />
+              <p class="field-hint">The rest goes to the story. Story beats that match your picks are kept first, and every scene card shows which pick it came from.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="advanced-grid">
+          <!-- RENDER ENGINE -->
+          <div class="config-box">
+            <div class="box-title"><label><i data-lucide="zap"></i> Render Engine &amp; Audio</label></div>
+            <div class="render-mode-options">
+              <label class="mode-option active">
+                <input type="radio" name="renderEngineMode" value="cinematic_nvenc" checked />
+                <div class="mode-text"><strong>🎬 Cinematic Master</strong><span>Frame-accurate cuts, GPU (NVENC) encoding when available, soft dissolves and audio cross-fades.</span></div>
+              </label>
+              <label class="mode-option">
+                <input type="radio" name="renderEngineMode" value="stream_copy" />
+                <div class="mode-text"><strong>⚡ Lightning Stream-Copy</strong><span>No video re-encoding: very fast, original quality, but cuts snap to keyframes.</span></div>
+              </label>
+            </div>
+            <div class="audio-norm-row"><label class="checkbox-row"><input type="checkbox" id="toggleAudioNorm" checked /><span>🔊 EBU R128 loudness normalization (evens out whispers and explosions)</span></label></div>
+            <div class="audio-norm-row" style="margin-top: 6px;"><label class="checkbox-row"><input type="checkbox" id="toggleAudioSmooth" checked /><span>🎶 Soft transitions (0.25 s dissolves and S-curve audio fades)</span></label></div>
+          </div>
+
+          <!-- NARRATOR -->
+          <div class="config-box">
+            <div class="box-title">
+              <label><i data-lucide="globe"></i> AI Narrator</label>
+              <label class="switch"><input type="checkbox" id="toggleVoiceover" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <p class="ai-desc">At each jump the narrator tells you what happened in the part that was cut out, and the film audio dips under the voice.</p>
+            <div class="voice-selector-row" id="voiceSelectorRow" style="opacity: 1;">
+              <div class="lang-voice-grid">
+                <div>
+                  <label for="languageSelect">Language:</label>
+                  <select id="languageSelect" class="styled-select">
+                    <option value="English" selected>English</option>
+                    <option value="Hindi">Hindi (हिन्दी)</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Japanese">Japanese</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="voiceSelect">Voice:</label>
+                  <select id="voiceSelect" class="styled-select">
+                    <option value="christopher" selected>Christopher (US English)</option>
+                    <option value="guy">Guy (US English)</option>
+                    <option value="en_in_prabhat">Prabhat (Indian English)</option>
+                    <option value="en_in_neerja">Neerja (Indian English, female)</option>
+                    <option value="hi_madhur">Madhur (Hindi, male)</option>
+                    <option value="hi_swara">Swara (Hindi, female)</option>
+                    <option value="es_jorge">Jorge (Spanish)</option>
+                    <option value="fr_henri">Henri (French)</option>
+                    <option value="de_conrad">Conrad (German)</option>
+                    <option value="ja_keita">Keita (Japanese)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="input-group" style="margin-top: 8px;">
+                <label for="narrationStyle">Narration describes:</label>
+                <select id="narrationStyle" class="styled-select">
+                  <option value="gap" selected>What was cut out: the main events, in brief (recommended)</option>
+                  <option value="story">Hand-written story lines when the film has them</option>
+                  <option value="scene_intro">The scene that is about to play</option>
+                </select>
+                <p class="field-hint" id="narrationEngineHint">Each line is written from the dialogue of the part that was cut out, never from earlier or later scenes.</p>
+              </div>
+              <div class="voice-action-btn"><button class="btn btn-sm btn-outline" id="btnTestVoice"><i data-lucide="volume-2"></i> Test Voice</button></div>
+              <p class="field-hint">Free voices come from Microsoft Edge's online read-aloud service (needs internet; meant for personal use). For monetized videos, record your own voice or use Azure AI Speech:</p>
+              <details class="azure-details">
+                <summary>Use Azure AI Speech (commercial licence)</summary>
+                <div class="lang-voice-grid" style="margin-top: 6px;">
+                  <input type="password" id="azureKey" placeholder="Azure Speech key" autocomplete="off" />
+                  <input type="text" id="azureRegion" placeholder="Region, e.g. centralindia" />
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- COPYRIGHT RISK CHECK -->
+          <div class="config-box fair-use-box">
+            <div class="box-title">
+              <label><i data-lucide="scale"></i> Copyright Risk Check</label>
+              <label class="switch"><input type="checkbox" id="toggleFairUseShield" /><span class="toggle-slider"></span></label>
+            </div>
+            <p class="ai-desc">Shows how much of the film you use, how long each clip runs, and how much of it has your commentary. It cannot make a copyrighted film safe to upload; a full-film recap stays high-risk.</p>
+            <div id="fairUseControls" style="opacity: 0.5; pointer-events: none; margin-top: 10px;">
+              <div class="fair-use-row" style="margin-top: 4px;">
+                <label for="fairUseMaxClip" style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-right: 8px;">Split clips longer than:</label>
+                <select id="fairUseMaxClip" class="styled-select-sm">
+                  <option value="5.0">5 seconds</option>
+                  <option value="7.0" selected>7 seconds</option>
+                  <option value="10.0">10 seconds</option>
+                  <option value="15.0">15 seconds</option>
+                </select>
+              </div>
+              <div class="fair-use-row" style="margin-top: 8px;">
+                <label class="checkbox-row"><input type="checkbox" id="toggleHorizontalFlip" /><span>🔄 Mirror image (style effect only; it does not avoid Content ID or help a fair-use claim)</span></label>
+              </div>
+              <div class="defense-score-meter" style="margin-top: 12px;">
+                <div class="meter-header" style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">
+                  <span>Transformation checklist:</span>
+                  <strong id="defenseScoreVal" style="color: var(--text-muted);">Inactive</strong>
+                </div>
+                <div class="meter-bar" style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                  <div id="defenseMeterFill" style="background: linear-gradient(90deg, #f59e0b, #10b981); width: 10%; height: 100%; transition: width 0.3s;"></div>
+                </div>
+                <span id="defenseScoreHint" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 4px;">Turn on to split clips and see the checklist.</span>
+              </div>
+              <div class="legal-actions-row" style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-sm btn-outline" id="btnDownloadDmcaPack"><i data-lucide="file-text"></i> Counter-notice draft (read first)</button>
+                <button class="btn btn-sm btn-outline" id="btnGenerateLegalSlate"><i data-lucide="info"></i> Commentary disclosure slate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-footer">
+          <button class="btn btn-hero" id="btnStartAnalysis" disabled><i data-lucide="wand-2"></i> Analyze &amp; Curate Scenes</button>
+        </div>
+      </section>
+
+      <!-- 3. TIMELINE -->
+      <section class="card glass" id="timelineCard" style="display: none;">
+        <div class="card-header">
+          <div class="title-with-icon"><i data-lucide="film"></i><h2>3. Director's Studio</h2></div>
+          <div class="timeline-stats">
+            <span class="stat-pill">Selected: <strong id="statSelectedTime">00:00</strong> / <span id="statTargetTime">30:00</span></span>
+            <span class="stat-pill">Scenes: <strong id="statSceneCount">0</strong></span>
+            <span class="stat-pill" id="qualityPill" title="">Quality: <strong id="statQuality">–</strong></span>
+            <button class="btn btn-sm btn-secondary" id="btnQualityCheck" title="An AI watches the cut like a first-time viewer">Check with AI</button>
+            <button class="btn btn-sm btn-secondary" id="btnQualityFix" title="Adds the scenes a viewer would miss and keeps your length">Fix weak spots</button>
+            <button class="btn btn-sm btn-secondary" id="btnRecalculate"><i data-lucide="refresh-cw"></i> Recalculate</button>
+          </div>
+        </div>
+
+        <div class="notice-banner" id="analysisWarnings" style="display: none;"></div>
+
+        <div class="timeline-wrapper">
+          <div class="timeline-ticks"><span>00:00</span><span>25%</span><span>50%</span><span>75%</span><span id="timelineEndTick">End</span></div>
+          <div class="timeline-bar" id="timelineBar"></div>
+          <div class="timeline-legend">
+            <span class="legend-item"><span class="legend-dot act-1"></span> Act 1 / early topics</span>
+            <span class="legend-item"><span class="legend-dot act-2"></span> Act 2 / middle</span>
+            <span class="legend-item"><span class="legend-dot act-3"></span> Act 3 / late</span>
+            <span class="legend-item"><span class="legend-dot skipped"></span> Excluded</span>
+          </div>
+        </div>
+
+        <div class="ai-overview-banner" id="aiOverviewBanner" style="display: none;">
+          <i data-lucide="quote" class="quote-icon"></i>
+          <div><strong id="aiOverviewLabel">Story overview:</strong><p id="aiOverviewText"></p></div>
+        </div>
+
+        <div class="export-toolbar-box">
+          <div class="export-toolbar-header">
+            <span class="toolbar-title"><i data-lucide="share-2"></i> Exports &amp; Extras</span>
+            <span class="toolbar-desc">Take the cut into your editor, add narration, or make shorts</span>
+          </div>
+          <div class="export-buttons-row">
+            <button class="btn btn-export" id="btnExportEdl"><i data-lucide="film"></i> DaVinci Resolve (.edl)</button>
+            <button class="btn btn-export" id="btnExportXml"><i data-lucide="scissors"></i> Premiere Pro (.xml)</button>
+            <button class="btn btn-export" id="btnExportSrt"><i data-lucide="subtitles"></i> Synced Subtitles (.srt)</button>
+            <button class="btn btn-export" id="btnYoutubeCut" style="display: none;" title="Plays the original YouTube upload through the official player, jumping between your scenes. Nothing is copied, so it is safe to share."><i data-lucide="youtube"></i> YouTube Embed Cut (share-safe)</button>
+            <button class="btn btn-export" id="btnExportNotes"><i data-lucide="notebook-pen"></i> Study / Scene Notes (.md)</button>
+            <button class="btn btn-export highlight" id="btnGenerateVoBridges"><i data-lucide="mic"></i> Generate Narration</button>
+            <button class="btn btn-export viral-btn" id="btnGenerateShorts"><i data-lucide="smartphone"></i> Generate Shorts (9:16)</button>
+            <button class="btn btn-export" id="btnMakeTrailer"><i data-lucide="clapperboard"></i> Make Trailer</button>
+            <select id="trailerLength" class="styled-select" style="width:auto" aria-label="Trailer length"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">2 min</option></select>
+            <label class="field-hint" style="margin:0"><input type="checkbox" id="trailerVertical" /> 9:16 for Reels</label>
+            <button class="btn btn-export" id="btnExplainFromJob" title="Retells the essence in new words with CineCut's own slides and narration, instead of re-using the footage"><i data-lucide="book-open"></i> Own-words summary</button>
+            <button class="btn btn-export" id="btnAddToLibrary" title="Adds this cut to the web library as a small recipe: the source link, clip times and narration text. No video file is stored."><i data-lucide="library"></i> Add to library</button>
+          </div>
+        </div>
+
+        <div class="analysis-warnings" id="qualityIssues" style="display: none;"></div>
+
+        <div class="viral-shorts-section" id="trailerSection" style="display: none;">
+          <div class="shorts-section-header">
+            <div class="title-with-icon"><i data-lucide="clapperboard" class="shorts-icon"></i><h3>Trailer</h3></div>
+            <a id="btnDownloadTrailer" class="btn btn-sm btn-primary"><i data-lucide="download"></i> Download</a>
+          </div>
+          <video id="trailerPlayer" controls preload="metadata" style="width:100%;max-height:480px;background:#000;border-radius:10px"></video>
+          <p class="field-hint" id="trailerPlan"></p>
+        </div>
+
+        <div class="viral-shorts-section" id="viralShortsSection" style="display: none;">
+          <div class="shorts-section-header">
+            <div class="title-with-icon"><i data-lucide="smartphone" class="shorts-icon"></i><h3>Vertical Shorts (9:16)</h3></div>
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <a id="btnDownloadShortsZip" class="btn btn-sm btn-primary"><i data-lucide="download"></i> Download All (ZIP)</a>
+            </div>
+          </div>
+          <div class="shorts-grid" id="shortsGrid"></div>
+          <div class="social-hub-card" id="socialHubCard" style="display: none; margin-top: 20px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 18px;">
+            <div class="title-with-icon" style="margin-bottom: 10px;"><i data-lucide="share-2"></i><h4 style="margin: 0; font-size: 1rem; color: #fff;">Posting Pack (titles, descriptions, credits)</h4></div>
+            <div class="social-cards-list" id="socialCardsList" style="display: flex; flex-direction: column; gap: 12px;"></div>
+            <div class="webhook-dispatch-row" style="margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 10px; align-items: center;">
+              <input type="url" id="socialWebhookUrl" placeholder="Optional: your Zapier / Make.com webhook URL" style="flex: 1;" />
+              <button class="btn btn-sm btn-primary" id="btnDispatchWebhook"><i data-lucide="send"></i> Send</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="shorts-options-row">
+          <label class="checkbox-row"><input type="checkbox" id="togglePanAndScan" /><span>🎯 Face-tracking pan &amp; scan (instead of blurred side bars)</span></label>
+          <label class="checkbox-row"><input type="checkbox" id="toggleBurnCaptions" checked /><span>💬 Burn in captions (needs subtitles)</span></label>
+          <label class="checkbox-row"><span>Caption style</span>
+            <select id="captionStyle" class="styled-select" style="width:auto">
+              <option value="karaoke" selected>Karaoke: words light up as spoken</option>
+              <option value="pop">Pop: the spoken word grows</option>
+              <option value="plain">Plain short lines</option>
+              <option value="classic">Classic subtitles</option>
+            </select></label>
+        </div>
+
+        <div class="scene-inspector">
+          <div class="inspector-header">
+            <h3>Curated Scenes (in story order)</h3>
+            <span class="inspector-hint">Click a thumbnail to preview · untick to drop a scene</span>
+          </div>
+          <div class="scene-cards-grid" id="sceneCardsGrid"></div>
+        </div>
+
+        <div class="render-bar">
+          <div class="render-info"><i data-lucide="sparkles"></i><span id="renderStatusText">Ready to render with chapter markers.</span></div>
+          <button class="btn btn-render" id="btnRenderSummary"><i data-lucide="play-circle"></i> Render Summary Video</button>
+        </div>
+      </section>
+
+      <!-- 4. RESULT -->
+      <section class="card glass success-card" id="exportCard" style="display: none;">
+        <div class="card-header">
+          <div class="title-with-icon"><i data-lucide="check-circle-2" class="success-icon"></i><h2>Summary Video Ready</h2></div>
+          <div class="badge-chapters"><i data-lucide="bookmark"></i> <span id="renderedInfo">Chapters embedded</span></div>
+        </div>
+        <div class="video-preview-box"><video id="finalVideoPlayer" controls preload="metadata" class="cinema-player"></video></div>
+        <div class="export-actions">
+          <a id="btnDownloadVideo" class="btn btn-primary"><i data-lucide="download"></i> Download MP4</a>
+          <button class="btn btn-secondary" id="btnOpenFolder"><i data-lucide="folder-open"></i> Open Output Folder</button>
+          <button class="btn btn-secondary" id="btnYoutubePack"><i data-lucide="youtube"></i> YouTube Upload Pack</button>
+        </div>
+        <div class="youtube-pack-box" id="youtubePackBox" style="display: none;">
+          <div class="box-title"><label>YouTube Studio upload pack</label><button class="btn btn-sm btn-outline" id="btnCopyYoutubePack"><i data-lucide="copy"></i> Copy</button></div>
+          <textarea id="youtubePackText" rows="10" readonly></textarea>
+          <ul id="youtubeChecklist" class="checklist"></ul>
+        </div>
+      </section>
+
+      <!-- 5. OWN-WORDS SUMMARY -->
+      <section class="card glass" id="explainerCard" hidden>
+        <div class="card-header">
+          <div class="title-with-icon"><i data-lucide="book-open"></i><h2 id="exResultTitle">Own-words summary</h2></div>
+          <span class="subtitle" id="exResultMeta"></span>
+        </div>
+        <div class="video-preview-box"><video id="explainerPlayer" controls preload="metadata" class="cinema-player"></video></div>
+        <div class="ex-facts" id="exFacts"></div>
+        <p class="ex-thesis" id="exThesis"></p>
+        <div class="ex-columns">
+          <div><h3>Takeaways</h3><ul id="exTakeaways"></ul></div>
+          <div><h3>Check yourself</h3><ol id="exQuiz"></ol></div>
+        </div>
+        <details class="ex-script"><summary>Read the narration</summary><div id="exScript"></div></details>
+        <div class="export-actions private-hide" id="exDownloads">
+          <a class="btn btn-primary" id="exDlVideo"><i data-lucide="download"></i> Video (MP4)</a>
+          <a class="btn btn-secondary" id="exDlScript"><i data-lucide="file-text"></i> Script (.md)</a>
+          <a class="btn btn-secondary" id="exDlSrt"><i data-lucide="subtitles"></i> Captions (.srt)</a>
+          <a class="btn btn-secondary" id="exDlNotes"><i data-lucide="braces"></i> Notes (.json)</a>
+          <button class="btn btn-secondary" id="exAddToLibrary"><i data-lucide="library"></i> Add to library</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- PROGRESS MODAL -->
+    <div class="modal-overlay" id="progressModal" style="display: none;">
+      <div class="modal-card glass">
+        <div class="modal-spinner"><div class="spinner-ring"></div><i data-lucide="film" class="spinner-icon"></i></div>
+        <h3 id="modalTitle">Processing Video...</h3>
+        <p id="modalMessage">Analyzing story structure...</p>
+        <div class="progress-bar-container"><div class="progress-bar-fill" id="progressBarFill" style="width: 5%;"></div></div>
+        <div class="progress-percentage" id="progressPctText">5%</div>
+      </div>
+    </div>
+
+    <!-- PREVIEW MODAL -->
+    <div class="modal-overlay" id="previewModal" style="display: none;">
+      <div class="modal-card glass preview-card">
+        <div class="modal-header"><h3 id="previewTitle">Scene Preview</h3><button class="close-btn" id="btnClosePreview"><i data-lucide="x"></i>✕</button></div>
+        <div class="preview-video-container"><video id="previewPlayer" controls autoplay class="preview-player"></video></div>
+        <div class="preview-meta">
+          <span id="previewTimestamp">-</span>
+          <p id="previewDialogue">-</p>
+          <div id="previewBridgeBox" class="preview-bridge-banner" style="display: none;"><i data-lucide="mic"></i><span id="previewBridgeText"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WATCHFOLDER MODAL -->
+    <div class="modal-overlay" id="watchfolderModal" style="display: none;">
+      <div class="modal-card glass" style="max-width: 650px; text-align: left;">
+        <div class="modal-header"><div class="title-with-icon"><i data-lucide="folder-sync"></i><h3>Plex / Jellyfin Watchfolder</h3></div><button class="close-btn" id="btnCloseWatchfolder">✕</button></div>
+        <p class="ai-desc" style="margin-bottom: 15px;">Watches a media folder and, when a new film finishes copying, writes a companion <code>[Movie] - Recap.mp4</code> next to it.</p>
+        <div class="input-group"><label for="watchfolderInput">Folder to watch:</label><input type="text" id="watchfolderInput" placeholder="e.g. D:\Plex\Movies" /></div>
+        <div class="lang-voice-grid" style="margin-top: 12px;">
+          <div>
+            <label for="watchfolderDuration">Recap length:</label>
+            <select id="watchfolderDuration" class="styled-select"><option value="10">10 minutes</option><option value="15" selected>15 minutes</option><option value="20">20 minutes</option></select>
+          </div>
+          <div>
+            <label for="watchfolderEngine">Render:</label>
+            <select id="watchfolderEngine" class="styled-select"><option value="stream_copy" selected>⚡ Stream-copy (fast)</option><option value="cinematic_nvenc">🎬 Re-encode (NVENC)</option></select>
+          </div>
+        </div>
+        <div style="margin-top: 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div class="status-pill" id="daemonStatusPill"><span class="pulse-dot"></span><span id="daemonStatusText">Inactive</span></div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-secondary" id="btnTriggerScanNow"><i data-lucide="refresh-cw"></i> Scan Now</button>
+            <button class="btn btn-primary" id="btnToggleDaemon"><i data-lucide="play"></i> Start</button>
+          </div>
+        </div>
+        <div style="margin-top: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Activity:</div>
+          <div id="daemonLogsList" style="max-height: 140px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">No activity yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NETFLIX / PRIME WATCH GUIDE & TV MODAL -->
+    <div class="modal-overlay" id="tvStreamingModal" style="display: none;">
+      <div class="modal-card glass" style="max-width: 820px; text-align: left; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header"><div class="title-with-icon"><i data-lucide="tv"></i><h3>Netflix / Prime Watch Guide &amp; TV Player</h3></div><button class="close-btn" id="btnCloseTvStreaming">✕</button></div>
+        <div class="tabs-nav" style="margin: 10px 0 15px;">
+          <button class="tab-btn active" id="tabBtnStreaming"><i data-lucide="list-video"></i> Watch Guide (Netflix, Prime, any app)</button>
+          <button class="tab-btn" id="tabBtnSmartTv"><i data-lucide="tv"></i> TV Player for your cuts</button>
+        </div>
+
+        <div class="subtab-pane active" id="subtabStreaming">
+          <div class="notice-banner info" style="display: block;">
+            <strong>How this works:</strong> CineCut does not copy or download anything from Netflix or Prime Video. Their video is DRM-protected, and copying it breaks their terms and anti-circumvention law. Instead, CineCut builds a <em>watch guide</em>: which timestamps to jump to so you watch the condensed story inside the official player, with a short recap of what you skipped.
+          </div>
+          <div class="wg-form">
+            <div class="input-group"><label for="wgTitle">Film title</label><input type="text" id="wgTitle" placeholder="e.g. Sholay, Inception, Mr. India" /></div>
+            <div class="input-group"><label for="wgRuntime">Runtime (minutes, as shown in the app)</label><input type="number" id="wgRuntime" min="11" max="600" placeholder="e.g. 148" /></div>
+            <div class="input-group"><label for="wgTarget">Watch time</label>
+              <select id="wgTarget" class="styled-select"><option value="10">10 min</option><option value="15" selected>15 min</option><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option></select></div>
+            <div class="input-group"><label for="wgLanguage">Recap language</label>
+              <select id="wgLanguage" class="styled-select"><option value="English" selected>English</option><option value="Hindi">Hindi</option></select></div>
+            <div class="input-group"><label for="wgSpoiler">Spoilers</label>
+              <select id="wgSpoiler" class="styled-select"><option value="full_cut" selected>Full story</option><option value="teaser_spoiler_free">Stop before the climax</option></select></div>
+            <div class="input-group"><label for="wgOffset">Offset (seconds)</label><input type="number" id="wgOffset" value="0" step="5" title="Shift every timestamp if the streaming version starts earlier or later" /></div>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+            <button class="btn btn-primary" id="btnBuildGuide"><i data-lucide="list-video"></i> Build Watch Guide</button>
+            <button class="btn btn-secondary" id="btnGuideAudio" disabled><i data-lucide="headphones"></i> Audio recap (MP3)</button>
+            <button class="btn btn-secondary" id="btnCopyGuide" disabled><i data-lucide="copy"></i> Copy guide</button>
+          </div>
+          <div id="wgResult" style="display: none; margin-top: 14px;">
+            <p class="field-hint" id="wgAccuracy"></p>
+            <ol class="guide-list" id="wgList"></ol>
+            <audio id="wgAudioPlayer" controls style="display: none; width: 100%; margin-top: 8px;"></audio>
+          </div>
+          <div class="wg-hud-help">
+            <h4>Optional: on-screen guide inside Netflix / Prime Video</h4>
+            <p>The CineCut Watch Guide browser extension shows the guide as a small panel on the Netflix or Prime Video page and can jump the official player to each key scene (and read the recap aloud with your computer's built-in voice). It never touches the video stream.</p>
+            <ol>
+              <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>) and turn on <strong>Developer mode</strong>.</li>
+              <li>Click <strong>Load unpacked</strong> and choose the folder <code id="extensionPath">cine_cut\browser_extension</code>.</li>
+              <li>Keep CineCut running, start a film on Netflix or Prime Video, and click the <strong>CineCut</strong> button that appears.</li>
+            </ol>
+            <p class="field-hint">Seeking inside Netflix and Prime Video relies on their web players and can break when they change them. Automated control of their players may conflict with their terms of use; you use it at your own discretion.</p>
+            <details><summary>Bookmarklet alternative (often blocked by the sites' security policy)</summary>
+              <pre id="bookmarkletCode" class="code-box"></pre>
+              <button class="btn btn-sm btn-outline" id="btnCopyBookmarklet"><i data-lucide="copy"></i> Copy bookmarklet</button>
+            </details>
+          </div>
+        </div>
+
+        <div class="subtab-pane" id="subtabSmartTv" style="display: none;">
+          <div class="notice-banner" id="tvLanNotice" style="display: none;"></div>
+          <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px; padding: 16px; margin-bottom: 18px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <div>
+                <span style="font-size: 0.75rem; text-transform: uppercase; color: #818cf8; font-weight: 700;">TV player address</span>
+                <h4 style="font-size: 1.2rem; font-weight: 800; color: #fff; margin-top: 2px;" id="tvModalLanUrl">-</h4>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-sm btn-secondary" id="btnCopyTvUrl"><i data-lucide="copy"></i> Copy</button>
+                <a href="/tv" target="_blank" class="btn btn-sm btn-primary"><i data-lucide="external-link"></i> Open here</a>
+              </div>
+            </div>
+            <p style="font-size: 0.82rem; color: #cbd5e1; margin-top: 8px;">Open this address in the browser on a Fire TV (Silk) or Android TV to browse and play the cuts in your output folder with the remote.</p>
+          </div>
+          <p class="field-hint">You can also cast any rendered video from Chrome or Edge on this PC (menu › Cast).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORAGE MODAL -->
+    <div class="modal-overlay" id="storageModal" style="display: none;">
+      <div class="modal-card glass" style="max-width: 560px; text-align: left;">
+        <div class="modal-header"><div class="title-with-icon"><i data-lucide="hard-drive"></i><h3>Storage</h3></div><button class="close-btn" id="btnCloseStorage">✕</button></div>
+        <ul class="storage-list" id="storageUsageList"><li>Loading...</li></ul>
+        <div class="input-group" style="margin-top: 10px;">
+          <label for="cleanupDays">Delete temporary files older than (days):</label>
+          <input type="number" id="cleanupDays" value="7" min="0" />
+        </div>
+        <label class="checkbox-row" style="margin-top: 8px;"><input type="checkbox" id="cleanupDownloads" /><span>Also delete old downloaded videos</span></label>
+        <label class="checkbox-row" style="margin-top: 4px;"><input type="checkbox" id="cleanupUploads" /><span>Also delete old uploaded videos</span></label>
+        <p class="field-hint">Rendered videos in the output folder are never deleted. Deleted temporary files cannot be recovered.</p>
+        <button class="btn btn-primary" id="btnRunCleanup" style="margin-top: 10px;"><i data-lucide="trash-2"></i> Clean Up</button>
+        <p class="field-hint" id="cleanupResult"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMS (shown until the current version is accepted) -->
+  <div class="modal-overlay" id="termsModal" style="display: none;">
+    <div class="modal-card glass terms-card" role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+      <div class="kicker">Before you start</div>
+      <h3 id="termsTitle">Use CineCut only for material you have the right to use</h3>
+      <ul class="terms-points">
+        <li><strong>Allowed:</strong> public-domain works, openly licensed works (for example Creative Commons that allows adaptations), your own work, or work you have written permission for.</li>
+        <li><strong>Private viewing:</strong> anything without a verified licence is shown to you only, cannot be downloaded or exported, and is deleted within <span id="termsTtl">60</span> minutes.</li>
+        <li><strong>Never:</strong> DRM streaming services, dodging copyright detection, or cloning real people's voices or faces.</li>
+        <li><strong>Your responsibility:</strong> if you break these rules, you cover the claims and costs that follow (Terms, section 13).</li>
+      </ul>
+      <p><a href="/terms" target="_blank" rel="noopener">Read the full Terms of Use (version <span id="termsVersion"></span>)</a></p>
+      <label class="checkbox-row"><input type="checkbox" id="termsAgree" /><span>I have read and agree to the Terms of Use.</span></label>
+      <button class="btn btn-primary" id="btnAcceptTerms" disabled>Agree and continue</button>
+    </div>
+  </div>
+
+  <div class="private-banner" id="privateBanner" role="status" hidden>
+    <i data-lucide="lock"></i>
+    <span id="privateBannerText">Private viewing</span>
+    <button class="btn btn-sm btn-outline" id="btnDeletePrivate">Delete now</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
