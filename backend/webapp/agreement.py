@@ -66,6 +66,23 @@ def wrapped(width: int = 92) -> str:
     return "\n".join(out)
 
 
+# Shortening a link: nothing is kept. Accepted per request, recorded with the link (no file is ever kept to fingerprint).
+SHORTEN_VERSION = "2026-09-18"
+SHORTEN_TEXT = """Shortening a video with CineCut
+
+1. You give us a link to a video you are allowed to watch.
+2. CineCut fetches the video only to make the short version. The original is deleted as soon as the short version is ready.
+3. The short version is shown only to you, on this page. It cannot be downloaded or saved. It is deleted 60 minutes after you last watch it, when you press Delete, or when CineCut restarts.
+4. Nothing from the video is kept: no copy, no clips, no pictures. We keep only this record: your account, the link, the time and the choices you made.
+5. Links to paid streaming services (Netflix, Prime Video and the like) are refused. They are protected, and we do not copy them.
+6. The narration and the choice of scenes are made with AI, and can be wrong.
+7. The short version is for your own viewing. Do not record it or share it."""
+
+
+def shorten_hash() -> str:
+    return hashlib.sha256(f"{SHORTEN_VERSION}\n{SHORTEN_TEXT}".encode("utf-8")).hexdigest()
+
+
 def text_hash() -> str:
     """Fingerprint of this exact wording; an acceptance must carry it, so it cannot be moved to different wording."""
     return hashlib.sha256(f"{VERSION}\n{TEXT}".encode("utf-8")).hexdigest()

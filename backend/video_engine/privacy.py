@@ -57,12 +57,16 @@ def _save(reg: Dict[str, Any]) -> None:
     os.replace(tmp, REGISTRY)
 
 
-def register(job_id: str, paths: Iterable[str] = ()) -> None:
+def register(job_id: str, paths: Iterable[str] = (), sweep_caches: bool = True) -> None:
+    """sweep_caches=False: the entry holds only its own paths (a finished short version waiting to be watched), so its
+    deletion must not sweep the shared caches that other jobs wrote while it waited."""
     with _lock:
         reg = _load()
         now = time.time()
         entry = reg.setdefault(job_id, {"paths": [], "started": now, "last_seen": now})
         entry["paths"] = sorted(set(entry["paths"]) | {str(p) for p in paths if p})
+        if not sweep_caches:
+            entry["no_cache_sweep"] = True
         entry["owner"] = os.getpid()          # the process holding it: start-up clean-up leaves live processes' items alone
         _save(reg)
 
@@ -149,7 +153,7 @@ def purge(job_id: str, jobs: Any = None, reason: str = "deleted") -> Dict[str, A
             removed += 1 if n else 0
             if Path(raw).exists():
                 leftovers.append(raw)
-    if entry and not entry.get("retry"):
+    if entry and not entry.get("retry") and not entry.get("no_cache_sweep"):
         started = entry.get("started", time.time()) - 5
         for sub in CACHE_DIRS:
             d = TEMP_DIR / sub

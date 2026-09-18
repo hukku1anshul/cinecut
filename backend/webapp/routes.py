@@ -22,7 +22,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from backend.config import BASE_DIR, OUTPUT_DIR, TEMP_DIR
-from backend.video_engine import rights
+from backend.video_engine import privacy, rights
 from backend.webapp import agreement, db, library, payments
 
 router = APIRouter()
@@ -135,6 +135,10 @@ def _work_view(w: Dict[str, Any]) -> Dict[str, Any]:
         out["files"] = sorted((res.get("files") or {}).keys())
     params = w.get("params") or {}
     out["params"] = {k: v for k, v in params.items() if k != "path"}
+    if w.get("kind") == "shorten":             # watchable until the viewing time runs out
+        left = privacy.expires_in(f"wv_{w['id']}")
+        out["watchable"] = left is not None and (WEB_PRIVATE / w["id"] / "short.mp4").is_file()
+        out["expires_in"] = left
     return out
 
 
@@ -151,13 +155,14 @@ def _run_tasks(bt: BackgroundTasks) -> None:
         t.func(*t.args, **t.kwargs)
 
 
-def studio_job(path: str, minutes: float, mode: str, title: str, basis: str = "own") -> Dict[str, Any]:
+def studio_job(path: str, minutes: float, mode: str, title: str, basis: Optional[str] = "own", **opts: Any) -> Dict[str, Any]:
+    """opts go to the studio's AnalyzeRequest as they are (force_private, preset, filters)."""
     app = _studio()
     app._web_terms.ok = True       # the web user accepted the Terms when signing up
     bt = BackgroundTasks()
     r = app.analyze_video(app.AnalyzeRequest(video_path=path, target_minutes=max(1, int(round(minutes))), content_mode=mode,
                                              rights_basis=basis, film_title=title,
-                                             use_vision=bool(os.environ.get("CINECUT_WEB_VISION"))), bt)
+                                             use_vision=bool(os.environ.get("CINECUT_WEB_VISION")), **opts), bt)
     _run_tasks(bt)
     job = app.JOBS[r["job_id"]]
     if job["status"] != "ready":
@@ -170,10 +175,10 @@ def studio_narrate(job: Dict[str, Any], language: str) -> None:
     asyncio.run(app.generate_voiceovers(job["job_id"], app.NarrateRequest(language=language, style="gap")))
 
 
-def studio_render(job: Dict[str, Any], language: str) -> str:
+def studio_render(job: Dict[str, Any], language: str, voiceover: bool = True) -> str:
     app = _studio()
     bt = BackgroundTasks()
-    app.render_job(job["job_id"], app.RenderRequest(include_voiceover=True, language=language), bt)
+    app.render_job(job["job_id"], app.RenderRequest(include_voiceover=voiceover, language=language), bt)
     _run_tasks(bt)
     if not job.get("output_file"):
         raise RuntimeError(job.get("error") or "Render failed.")
@@ -579,6 +584,114 @@ def delete_upload(wid: str, request: Request):
         db.update_work(job["id"], status="deleted", message="Deleted at your request.", result="{}")
     db.update_work(wid, status="deleted", message="File deleted at your request.")
     return {"deleted": True, "files_removed": removed}
+
+
+# ------------------------------------------------------------------ shorten a link: nothing is kept
+# The viewer gives a link and chooses the length and focus. The video is fetched only to make the short version and is
+# deleted (with everything made on the way) the moment that is ready; the short version is streamed to the viewer alone,
+# never offered as a download, and deleted 60 minutes after it was last watched, on Delete, or when CineCut restarts.
+WEB_PRIVATE = TEMP_DIR / "web_private"
+PRESET_CHOICES = ("story_focused", "action_energy", "musical_romance", "comedy_fun", "emotional_drama", "hero_spotlight",
+                  "villain_lore", "balanced_cinema")
+
+
+class ShortenRequest(BaseModel):
+    url: str
+    minutes: int = Field(10, ge=1, le=60)
+    style: str = "movie"              # movie | lecture
+    preset: str = "story_focused"
+    narrate: bool = True
+    language: str = "Hindi"
+    agreed_hash: str = ""
+
+
+@router.get("/api/app/shorten/terms")
+def shorten_terms():
+    presets = _studio().PRESETS
+    return {"version": agreement.SHORTEN_VERSION, "hash": agreement.shorten_hash(), "text": agreement.SHORTEN_TEXT,
+            "presets": {k: presets[k]["name"] for k in PRESET_CHOICES if k in presets}, "keep_minutes": privacy.TTL_SEC // 60}
+
+
+@router.post("/api/app/shorten")
+def shorten(req: ShortenRequest, request: Request):
+    user = need_user(request)
+    need_access(user, "creator")
+    if req.agreed_hash != agreement.shorten_hash():
+        raise HTTPException(status_code=400, detail="Read the shortening terms and accept them first (reload the page if they changed).")
+    if req.preset not in PRESET_CHOICES:
+        raise HTTPException(status_code=400, detail="Choose what the short version should focus on.")
+    url = req.url.strip()
+    report, decision = _studio()._checked_link(url, None, True)    # refuses protected streaming services; always private
+    wid = db.create_work(user["id"], "shorten", {"url": url[:500], "minutes": req.minutes, "style": req.style, "preset": req.preset,
+                                                 "narrate": req.narrate, "language": req.language})
+    db.record_consent(user["id"], "shorten", agreement.SHORTEN_VERSION, agreement.shorten_hash(), "view", url[:500], wid,
+                      ip=_client_ip(request), agent=request.headers.get("user-agent", ""))
+    _spawn(wid, lambda p: _shorten_run(req, url, wid, report, decision, p))
+    return {"work_id": wid}
+
+
+def _shorten_run(req: ShortenRequest, url: str, wid: str, report, decision, progress) -> Dict[str, Any]:
+    app = _studio()
+    lang = req.language if req.language in LANGUAGES else "Hindi"
+    hold, job, src_dir = f"dl_{wid}", None, None
+    try:
+        progress(4, "Fetching the video. The original is deleted as soon as the short version is ready.")
+        meta = app._download_with_ytdlp(url, {}, 720)
+        src_dir = Path(meta["file_path"]).parent
+        app._register_download(meta, report, decision, hold)
+        title = (meta.get("youtube_title") or "Video")[:120]
+        if " " not in title:                   # a direct file link names the file: "jsc2026m000044_10_Days_in_Orion~medium"
+            title = re.sub(r"^[a-z]{2,5}\d[\da-z]{5,}_", "", re.sub(r"~\w+$", "", title)).replace("_", " ").strip() or "Video"
+        progress(25, "Finding the parts that match your choices...")
+        job = studio_job(meta["file_path"], req.minutes, "lecture" if req.style == "lecture" else "movie", title, None,
+                         force_private=True, preset=req.preset)
+        if req.narrate:
+            progress(55, "Writing the narration...")
+            studio_narrate(job, lang)
+        progress(75, "Making the short version...")
+        made = studio_render(job, lang, req.narrate)
+        keep = WEB_PRIVATE / wid
+        keep.mkdir(parents=True, exist_ok=True)
+        short = keep / "short.mp4"
+        shutil.move(made, short)
+        privacy.register(f"wv_{wid}", [str(keep)], sweep_caches=False)   # deleted after the viewing time, on Delete, or at restart
+        from backend.video_engine.probe import get_video_metadata
+        return {"title": title, "short_minutes": round(get_video_metadata(str(short))["duration_sec"] / 60, 1),
+                "source_minutes": round((meta.get("duration_sec") or 0) / 60, 1), "keep_minutes": privacy.TTL_SEC // 60}
+    finally:                                   # the original and everything made on the way go now, finished or not
+        if job:
+            privacy.purge(job["job_id"], app.JOBS, reason="short version made")
+        privacy.purge(hold, None, reason="short version made")
+        if src_dir:
+            shutil.rmtree(src_dir, ignore_errors=True)
+
+
+def _own_shorten(wid: str, request: Request) -> Dict[str, Any]:
+    user = need_user(request)
+    w = db.get_work(wid)
+    if not w or w["user_id"] != user["id"] or w["kind"] != "shorten":
+        raise HTTPException(status_code=404, detail="Not found.")
+    return w
+
+
+@router.get("/api/app/shorten/{wid}/watch")
+def shorten_watch(wid: str, request: Request):
+    """Streams the short version to its viewer only: shown inline, never offered as a file, never cached."""
+    _own_shorten(wid, request)
+    short = WEB_PRIVATE / wid / "short.mp4"
+    if not short.is_file() or not privacy.is_registered(f"wv_{wid}"):
+        raise HTTPException(status_code=410, detail="This short version has been deleted, as promised. Shorten the link again to watch it.")
+    privacy.touch(f"wv_{wid}")
+    return FileResponse(short, media_type="video/mp4", headers={"Content-Disposition": "inline", "Cache-Control": "no-store, private"})
+
+
+@router.delete("/api/app/shorten/{wid}")
+def shorten_delete(wid: str, request: Request):
+    _own_shorten(wid, request)
+    privacy.purge(f"wv_{wid}", None, reason="deleted by the viewer")
+    shutil.rmtree(WEB_PRIVATE / wid, ignore_errors=True)
+    db.update_work(wid, status="deleted", message="Deleted.")
+    return {"deleted": True}
 
 
 # ------------------------------------------------------------------ creator plan

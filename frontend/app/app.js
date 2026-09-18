@@ -8,7 +8,7 @@ const view = () => document.getElementById("view");
 const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const KIND_NAMES = { movie: "Movie", series: "Series", book: "Book", lecture: "Lecture", story: "Story" };
 const STREAM_NAMES = { library: "Library", creator: "Creators", institute: "Institutes and colleges", company: "Company training", api: "Partners and licensing" };
-const WORK_NAMES = { creator_cut: "Condensed cut", creator_reels: "Reels", creator_dub: "Dub", creator_explainer: "Own-words explainer",
+const WORK_NAMES = { shorten: "Short version", creator_cut: "Condensed cut", creator_reels: "Reels", creator_dub: "Dub", creator_explainer: "Own-words explainer",
   explainer: "Book explainer", org_content: "Workspace content" };
 
 async function api(url, opts = {}) {
@@ -583,6 +583,7 @@ function upload(file, extra, bar) {
 }
 
 function workHtml(w) {
+  if (w.kind === "shorten") return shortHtml(w);
   const files = (w.files || []).map((f) => {
     const url = `/api/app/work/${w.id}/file/${encodeURIComponent(f)}`;
     return /video|reel/.test(f)
@@ -599,7 +600,23 @@ function workHtml(w) {
 async function listWork(box, orgId) {
   const draw = async () => {
     const d = await api(`/api/app/work${orgId ? `?org_id=${orgId}` : ""}`);
-    box.innerHTML = d.work.map(workHtml).join("") || `<p class="muted">Nothing yet.</p>`;
+    if (!d.work.length) { box.innerHTML = `<p class="muted">Nothing yet.</p>`; return false; }
+    box.querySelector(":scope > p.muted")?.remove();
+    const keep = new Set();
+    d.work.forEach((w, i) => {
+      keep.add(w.id);
+      let el = box.querySelector(`:scope > [data-wid="${w.id}"]`);
+      if (!el) { el = document.createElement("div"); el.dataset.wid = w.id; box.insertBefore(el, box.children[i] || null); }
+      const sig = [w.status, w.progress, w.message, w.watchable, (w.files || []).join()].join("|");
+      if (el.dataset.sig === sig) return;
+      el.dataset.sig = sig;
+      el.innerHTML = workHtml(w);
+      el.querySelectorAll("[data-sdel]").forEach((b) => b.onclick = async () => {
+        if (!confirm("Delete this short version now?")) return;
+        try { await api(`/api/app/shorten/${b.dataset.sdel}`, { method: "DELETE" }); toast("Deleted."); draw(); } catch (e) { toast(e.message, true); }
+      });
+    });
+    [...box.children].forEach((el) => { if (el.dataset.wid && !keep.has(el.dataset.wid)) el.remove(); });
     return d.work.some((w) => w.status === "running" || w.status === "queued");
   };
   let busy = await draw();
@@ -640,69 +657,63 @@ function agreeValues(p) {
   return { basis, details, agreed_hash: AGREEMENT.hash };
 }
 
-async function listUploads(box) {
-  const d = await api("/api/app/uploads").catch(() => ({ uploads: [] }));
-  box.innerHTML = d.uploads.map((u) => `<div class="work"><div class="row" style="justify-content:space-between">
-      <strong>${esc(u.name || "")}</strong><span class="tag ${u.deleted ? "" : "teal"}">${u.deleted ? "deleted" : `${u.minutes || 0} min`}</span></div>
-    <p class="muted" style="margin:0">${esc(u.basis_text || "")}${u.details ? ` &middot; ${esc(u.details)}` : ""}<br />Fingerprint ${esc(u.sha256 || "")}&hellip;</p>
-    <div class="row"><a class="btn small" href="/api/app/uploads/${esc(u.id)}/agreement?download=true">Agreement record</a>
-      ${u.deleted ? "" : `<button class="btn small" data-del="${esc(u.id)}">Delete file and results</button>`}</div></div>`).join("")
-    || `<p class="muted">No files yet.</p>`;
-  box.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
-    if (!confirm("Delete this file and everything made from it? This cannot be undone.")) return;
+// ---------------------------------------------------------------- shorten a link (nothing is kept)
+async function pageCreate() {
+  if (!S.me?.user) { view().innerHTML = loginPrompt("Any video, shortened for you", "Sign up free, paste a link and watch a short version made for you. Nothing is kept."); return; }
+  const T = await api("/api/app/shorten/terms");
+  view().innerHTML = `
+    <section class="hero"><div><span class="tag teal">Shorten</span><h1>Paste a link. Watch the short version.</h1>
+      <p>CineCut keeps the parts you care about, adds a short narration between them if you like, and plays the result here.
+      The original is deleted as soon as the short version is ready. The short version can't be downloaded, and it is deleted
+      ${T.keep_minutes} minutes after you last watch it.</p></div></section>
+    <section class="cols">
+      <form class="panel form" id="sForm">
+        <h3>1. The video</h3>
+        <input id="sUrl" type="url" required class="field" placeholder="https://www.youtube.com/watch?v=..." />
+        <h3>2. How short, and what to keep</h3>
+        <div class="two"><label>Length (minutes) <input id="sMin" type="number" min="1" max="60" value="10" /></label>
+          <label>It is mostly <select id="sStyle"><option value="movie">A film, story or vlog</option><option value="lecture">A talk or lesson</option></select></label></div>
+        <label>Keep mostly <select id="sPreset">${Object.entries(T.presets).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
+        <div class="two"><label class="check"><input type="checkbox" id="sNarr" checked /> <span>Add a short narration between the parts</span></label>
+          <label>Narration language <select id="sLang">${langOptions("Hindi")}</select></label></div>
+        <div class="agree"><details><summary>How this works, please read</summary><pre class="agree-text">${esc(T.text)}</pre></details>
+          <label class="check"><input type="checkbox" id="sAgree" /> <span>I have read how this works and I accept it.</span></label></div>
+        <button class="btn primary">Shorten and watch</button>
+        <p class="error" id="sErr" hidden></p>
+      </form>
+      <div class="panel"><h3>Your short versions</h3><div id="sWork"></div></div>
+    </section>`;
+  const poke = await listWork($("#sWork"));
+  $("#sForm").onsubmit = async (e) => {
+    e.preventDefault();
+    $("#sErr").hidden = true;
     try {
-      const r = await api(`/api/app/uploads/${b.dataset.del}`, { method: "DELETE" });
-      toast(`Deleted. ${r.files_removed} file${r.files_removed === 1 ? "" : "s"} removed.`);
-      listUploads(box);
-    } catch (e) { toast(e.message, true); }
-  });
+      if (!$("#sAgree").checked) throw new Error("Read how this works and accept it first.");
+      await api("/api/app/shorten", { json: { url: $("#sUrl").value.trim(), minutes: +$("#sMin").value || 10, style: $("#sStyle").value,
+        preset: $("#sPreset").value, narrate: $("#sNarr").checked, language: $("#sLang").value, agreed_hash: T.hash } });
+      toast("Started. It appears on the right when it is ready.");
+      poke();
+      listWork($("#sWork"));
+    } catch (err) { $("#sErr").textContent = err.message; $("#sErr").hidden = false; }
+  };
 }
 
-// ---------------------------------------------------------------- creator
-async function pageCreate() {
-  if (!S.me?.user) { view().innerHTML = loginPrompt("Your videos, cut, clipped and dubbed", "Sign up free to make condensed cuts, reels and dubs of your own videos."); return; }
-  const A = await agreement();
-  view().innerHTML = `
-    <section class="hero"><div><span class="tag teal">Creator</span><h1>Your videos, cut, clipped and dubbed</h1>
-      <p>Upload a video you made. CineCut makes a condensed cut with narration, 9:16 reels with captions, a Hindi or regional dub, or an own-words explainer.
-      Every file ends with a credits card that says it was made with AI.</p></div></section>
-    <section class="cols">
-      <form class="panel form" id="cForm">
-        <h3>1. Upload your video</h3>
-        <input type="file" id="cFile" accept="video/*" required class="field" />
-        ${agreeHtml(A, "c")}
-        <div class="bar-progress"><span id="cBar"></span></div>
-        <h3>2. Choose what to make</h3>
-        <div class="two"><label>Make <select id="cAction"><option value="cut">Condensed cut with narration</option><option value="reels">3 reels (9:16) with captions</option>
-          <option value="dub">A dub in another language</option><option value="explainer">An own-words explainer</option></select></label>
-          <label>Language <select id="cLang">${langOptions("Hindi")}</select></label></div>
-        <div class="two"><label>It is mostly <select id="cStyle"><option value="movie">A story, vlog or film</option><option value="lecture">A talk or lesson</option></select></label>
-          <label>Length of the result (minutes) <input id="cMin" type="number" min="1" max="60" value="10" /></label></div>
-        <button class="btn primary">Upload and start</button>
-        <p class="error" id="cErr" hidden></p>
-      </form>
-      <div class="panel"><h3>Your work</h3><div id="cWork"></div></div>
-    </section>
-    <section class="cols"><div class="panel"><h3>Your files</h3><div id="cFiles"></div>
-      <p class="muted">Delete removes the file you sent and everything made from it. The record of what you agreed is kept, and you can download it at any time.</p></div></section>`;
-  wireAgree("c");
-  const poke = await listWork($("#cWork"));
-  listUploads($("#cFiles"));
-  $("#cForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const file = $("#cFile").files[0];
-    $("#cErr").hidden = true;
-    if (!file) return;
-    try {
-      const up = await upload(file, agreeValues("c"), $("#cBar"));
-      await api("/api/app/creator/jobs", { json: { upload_id: up.upload_id, action: $("#cAction").value, language: $("#cLang").value,
-        style: $("#cStyle").value, minutes: +$("#cMin").value || 10 } });
-      toast("Started. You can leave this page; the work continues.");
-      poke();
-      listWork($("#cWork"));
-      listUploads($("#cFiles"));
-    } catch (err) { $("#cErr").textContent = err.message; $("#cErr").hidden = false; }
-  };
+function shortHtml(w) {
+  const name = esc(w.result?.title || w.params?.url || "");
+  if (w.status === "running" || w.status === "queued") {
+    return `<div class="work"><strong>${name || "Shortening..."}</strong><div class="bar-progress"><span style="width:${Math.max(3, w.progress || 0)}%"></span></div>
+      <p class="muted" style="margin:0">${esc(w.message || "")}</p></div>`;
+  }
+  if (w.status === "error") return `<div class="work"><strong>${name}</strong><span class="tag">not made</span><p class="muted" style="margin:0">${esc(w.message || "")}</p></div>`;
+  if (w.status === "done" && w.watchable) {
+    return `<div class="work"><div class="row" style="justify-content:space-between"><strong>${name}</strong>
+        <span class="tag teal">${w.result?.short_minutes ?? ""} min (from ${w.result?.source_minutes ?? "?"})</span></div>
+      <video src="/api/app/shorten/${esc(w.id)}/watch" controls controlslist="nodownload noremoteplayback" disablepictureinpicture
+        oncontextmenu="return false" preload="metadata"></video>
+      <div class="row" style="justify-content:space-between"><span class="muted">Only you can watch it. Deleted ${w.result?.keep_minutes || 60} minutes after you last watch it.</span>
+        <button class="btn small" data-sdel="${esc(w.id)}">Delete now</button></div></div>`;
+  }
+  return `<div class="work"><strong>${name}</strong> <span class="tag">deleted</span><p class="muted" style="margin:0">The short version was deleted, as promised. Shorten the link again to watch it.</p></div>`;
 }
 
 // ---------------------------------------------------------------- workspaces
