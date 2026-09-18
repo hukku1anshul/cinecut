@@ -586,6 +586,16 @@ def delete_upload(wid: str, request: Request):
     return {"deleted": True, "files_removed": removed}
 
 
+# ------------------------------------------------------------------ the phone app
+@router.get("/api/app/android.apk")
+def android_app():
+    """The Android app (a test build, output/CineCut-android.apk), so a phone can install it straight from the site."""
+    apk = OUTPUT_DIR / "CineCut-android.apk"
+    if not apk.is_file():
+        raise HTTPException(status_code=404, detail="The Android app has not been built on this server yet.")
+    return FileResponse(apk, media_type="application/vnd.android.package-archive", filename="CineCut.apk")
+
+
 # ------------------------------------------------------------------ shorten a link: nothing is kept
 # The viewer gives a link and chooses the length and focus. The video is fetched only to make the short version and is
 # deleted (with everything made on the way) the moment that is ready; the short version is streamed to the viewer alone,
