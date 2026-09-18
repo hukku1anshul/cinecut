@@ -611,6 +611,15 @@ def narration_audio(entry: Dict[str, Any], lang: str, idx: int) -> Path:
     return path
 
 
+# Project Gutenberg names some files by edition ("Alice's Adventures in Wonderland HTML Edition", "... Illustrated by
+# Arthur Rackham. With a Proem by Austin Dobson"). The shelf shows the work's name; the full name stays in source_title.
+_EDITION_TAIL = re.compile(r"[\s.,;:]+(HTML Edition|Illustrated by\b.*|With (a|an) (Proem|Preface|Foreword|Introduction)\b.*)$", re.I)
+
+
+def display_title(title: str) -> str:
+    return _EDITION_TAIL.sub("", title or "").strip() or title
+
+
 def apply_explainer(entry: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
     """Turns a catalogue entry into a ready title from an explainer result (the entry keeps its id and source)."""
     e = get(entry["id"]) or entry
@@ -625,6 +634,8 @@ def apply_explainer(entry: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, 
         # NASA's archive names are often file names ("2021-05-05-Community Leaders V1- OC"): the shelf shows the
         # explainer's own title, and NASA's name stays in the credit line (rights.attribution) and in based_on.
         e["source_title"], e["title"] = e["title"], result["title"]
+    elif display_title(e.get("title") or "") != e.get("title") and not e.get("source_title"):
+        e["source_title"], e["title"] = e["title"], display_title(e["title"])
     e.update({"script": {"title": result.get("title"), "thesis": result.get("thesis"), "hook": result.get("hook"), "sections": sections,
                          "takeaways": result.get("takeaways") or [], "glossary": result.get("glossary") or [], "quiz": result.get("quiz") or [],
                          "based_on": based_on},
