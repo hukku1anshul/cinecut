@@ -36,3 +36,9 @@ venv/
 # Old local experiments with a copyrighted film: never public
 render_mr_india_new_cut.py
 test_hindi_mr_india.py
+
+# Android build output and this machine's SDK path
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties

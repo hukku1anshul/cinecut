@@ -658,9 +658,9 @@ function agreeValues(p) {
 }
 
 // ---------------------------------------------------------------- shorten a link (nothing is kept)
-async function pageCreate() {
+async function pageCreate(shared = "") {
   if (!S.me?.user) { view().innerHTML = loginPrompt("Any video, shortened for you", "Sign up free, paste a link and watch a short version made for you. Nothing is kept."); return; }
-  const T = await api("/api/app/shorten/terms");
+  const [T, A] = await Promise.all([api("/api/app/shorten/terms"), agreement()]);
   view().innerHTML = `
     <section class="hero"><div><span class="tag teal">Shorten</span><h1>Paste a link. Watch the short version.</h1>
       <p>CineCut keeps the parts you care about, adds a short narration between them if you like, and plays the result here.
@@ -669,7 +669,12 @@ async function pageCreate() {
     <section class="cols">
       <form class="panel form" id="sForm">
         <h3>1. The video</h3>
-        <input id="sUrl" type="url" required class="field" placeholder="https://www.youtube.com/watch?v=..." />
+        <div class="row" role="radiogroup" aria-label="Where the video is">
+          <label class="check"><input type="radio" name="sSrc" value="link" checked /> <span>A link</span></label>
+          <label class="check"><input type="radio" name="sSrc" value="file" /> <span>My own video file</span></label></div>
+        <input id="sUrl" type="url" class="field" placeholder="https://www.youtube.com/watch?v=..." value="${esc(shared)}" />
+        <div id="sFileBox" hidden><input type="file" id="sFile" accept="video/*" class="field" />${agreeHtml(A, "c")}
+          <div class="bar-progress"><span id="sBar"></span></div></div>
         <h3>2. How short, and what to keep</h3>
         <div class="two"><label>Length (minutes) <input id="sMin" type="number" min="1" max="60" value="10" /></label>
           <label>It is mostly <select id="sStyle"><option value="movie">A film, story or vlog</option><option value="lecture">A talk or lesson</option></select></label></div>
@@ -683,13 +688,22 @@ async function pageCreate() {
       </form>
       <div class="panel"><h3>Your short versions</h3><div id="sWork"></div></div>
     </section>`;
+  wireAgree("c");
+  const fileMode = () => $("input[name=sSrc]:checked").value === "file";
+  $$("input[name=sSrc]").forEach((r) => r.onchange = () => { $("#sUrl").hidden = fileMode(); $("#sFileBox").hidden = !fileMode(); });
   const poke = await listWork($("#sWork"));
   $("#sForm").onsubmit = async (e) => {
     e.preventDefault();
     $("#sErr").hidden = true;
     try {
       if (!$("#sAgree").checked) throw new Error("Read how this works and accept it first.");
-      await api("/api/app/shorten", { json: { url: $("#sUrl").value.trim(), minutes: +$("#sMin").value || 10, style: $("#sStyle").value,
+      let source = { url: $("#sUrl").value.trim() };
+      if (fileMode()) {
+        const file = $("#sFile").files[0];
+        if (!file) throw new Error("Choose a video file.");
+        source = { upload_id: (await upload(file, agreeValues("c"), $("#sBar"))).upload_id };
+      } else if (!source.url) throw new Error("Paste a link to the video.");
+      await api("/api/app/shorten", { json: { ...source, minutes: +$("#sMin").value || 10, style: $("#sStyle").value,
         preset: $("#sPreset").value, narrate: $("#sNarr").checked, language: $("#sLang").value, agreed_hash: T.hash } });
       toast("Started. It appears on the right when it is ready.");
       poke();
@@ -699,7 +713,7 @@ async function pageCreate() {
 }
 
 function shortHtml(w) {
-  const name = esc(w.result?.title || w.params?.url || "");
+  const name = esc(w.result?.title || w.params?.name || w.params?.url || "");
   if (w.status === "running" || w.status === "queued") {
     return `<div class="work"><strong>${name || "Shortening..."}</strong><div class="bar-progress"><span style="width:${Math.max(3, w.progress || 0)}%"></span></div>
       <p class="muted" style="margin:0">${esc(w.message || "")}</p></div>`;

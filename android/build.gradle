@@ -1,0 +1,10 @@
+// The CineCut phone app: a thin client for the CineCut server. Plain Java and the platform's own WebView, no extra libraries.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+    }
+}

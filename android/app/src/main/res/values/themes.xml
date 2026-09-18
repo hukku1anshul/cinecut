@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ground">#FF11151C</color>
+    <color name="accent">#FFFF9D2E</color>
+
+    <style name="CineCut" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorPrimary">@color/ground</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:statusBarColor">@color/ground</item>
+        <item name="android:navigationBarColor">@color/ground</item>
+    </style>
+</resources>

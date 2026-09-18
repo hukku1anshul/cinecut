@@ -596,7 +596,8 @@ PRESET_CHOICES = ("story_focused", "action_energy", "musical_romance", "comedy_f
 
 
 class ShortenRequest(BaseModel):
-    url: str
+    url: str = ""
+    upload_id: str = ""               # or the viewer's own uploaded video (accepted under the Uploader Agreement)
     minutes: int = Field(10, ge=1, le=60)
     style: str = "movie"              # movie | lecture
     preset: str = "story_focused"
@@ -620,25 +621,37 @@ def shorten(req: ShortenRequest, request: Request):
         raise HTTPException(status_code=400, detail="Read the shortening terms and accept them first (reload the page if they changed).")
     if req.preset not in PRESET_CHOICES:
         raise HTTPException(status_code=400, detail="Choose what the short version should focus on.")
-    url = req.url.strip()
-    report, decision = _studio()._checked_link(url, None, True)    # refuses protected streaming services; always private
-    wid = db.create_work(user["id"], "shorten", {"url": url[:500], "minutes": req.minutes, "style": req.style, "preset": req.preset,
-                                                 "narrate": req.narrate, "language": req.language})
-    db.record_consent(user["id"], "shorten", agreement.SHORTEN_VERSION, agreement.shorten_hash(), "view", url[:500], wid,
+    url, up, report, decision = req.url.strip(), None, None, None
+    if req.upload_id:
+        up = dict(_upload(req.upload_id, user), upload_id=req.upload_id)
+        if up["kind"] != "video":
+            raise HTTPException(status_code=400, detail="Choose a video file.")
+    elif url:
+        report, decision = _studio()._checked_link(url, None, True)    # refuses protected streaming services; always private
+    else:
+        raise HTTPException(status_code=400, detail="Paste a link, or choose a video of your own.")
+    what = f"your file: {up['name']}" if up else url[:500]
+    wid = db.create_work(user["id"], "shorten", {"url": "" if up else url[:500], "name": up["name"] if up else "", "minutes": req.minutes,
+                                                 "style": req.style, "preset": req.preset, "narrate": req.narrate, "language": req.language})
+    db.record_consent(user["id"], "shorten", agreement.SHORTEN_VERSION, agreement.shorten_hash(), "view", what, wid,
                       ip=_client_ip(request), agent=request.headers.get("user-agent", ""))
-    _spawn(wid, lambda p: _shorten_run(req, url, wid, report, decision, p))
+    _spawn(wid, lambda p: _shorten_run(req, url, up, wid, report, decision, p))
     return {"work_id": wid}
 
 
-def _shorten_run(req: ShortenRequest, url: str, wid: str, report, decision, progress) -> Dict[str, Any]:
+def _shorten_run(req: ShortenRequest, url: str, up: Optional[Dict[str, Any]], wid: str, report, decision, progress) -> Dict[str, Any]:
     app = _studio()
     lang = req.language if req.language in LANGUAGES else "Hindi"
     hold, job, src_dir = f"dl_{wid}", None, None
     try:
-        progress(4, "Fetching the video. The original is deleted as soon as the short version is ready.")
-        meta = app._download_with_ytdlp(url, {}, 720)
-        src_dir = Path(meta["file_path"]).parent
-        app._register_download(meta, report, decision, hold)
+        if up:                                 # the viewer's own file: it goes too, once its short version exists
+            from backend.video_engine.probe import get_video_metadata
+            meta = dict(get_video_metadata(up["path"]), file_path=up["path"], youtube_title=Path(up["name"]).stem)
+        else:
+            progress(4, "Fetching the video. The original is deleted as soon as the short version is ready.")
+            meta = app._download_with_ytdlp(url, {}, 720)
+            src_dir = Path(meta["file_path"]).parent
+            app._register_download(meta, report, decision, hold)
         title = (meta.get("youtube_title") or "Video")[:120]
         if " " not in title:                   # a direct file link names the file: "jsc2026m000044_10_Days_in_Orion~medium"
             title = re.sub(r"^[a-z]{2,5}\d[\da-z]{5,}_", "", re.sub(r"~\w+$", "", title)).replace("_", " ").strip() or "Video"
@@ -664,6 +677,9 @@ def _shorten_run(req: ShortenRequest, url: str, wid: str, report, decision, prog
         privacy.purge(hold, None, reason="short version made")
         if src_dir:
             shutil.rmtree(src_dir, ignore_errors=True)
+        if up:
+            Path(up["path"]).unlink(missing_ok=True)
+            db.update_work(up["upload_id"], status="deleted", message="Deleted once its short version was made.")
 
 
 def _own_shorten(wid: str, request: Request) -> Dict[str, Any]:
