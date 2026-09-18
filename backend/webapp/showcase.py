@@ -146,9 +146,10 @@ def _blocks(e: Dict[str, Any], language: str) -> List[str]:
 def _concat(parts: List[Path], out: Path, work: Path) -> None:
     lst = work / "concat.txt"
     lst.write_text("".join(f"file '{p.resolve().as_posix()}'\n" for p in parts), encoding="utf-8")
-    _run([FFMPEG_BIN, "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c:v", "libx264", "-preset", "veryfast",
-          "-crf", "20", "-pix_fmt", "yuv420p", "-r", str(FPS), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
-          "-movflags", "+faststart", str(out)])
+    # one loudness for every video (YouTube's range), with a ceiling so narrator peaks never crackle
+    _run([FFMPEG_BIN, "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c:v", "libx264", "-preset", "medium",
+          "-crf", "23", "-pix_fmt", "yuv420p", "-r", str(FPS), "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:a", "aac", "-b:a", "160k",
+          "-ar", "48000", "-ac", "2", "-movflags", "+faststart", str(out)])
 
 
 def _credit(e: Dict[str, Any]) -> str:
